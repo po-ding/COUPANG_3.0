@@ -3,9 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>운송 기록부</title>
+    <title>운송 기록부 (통합본)</title>
     <link rel="stylesheet" href="style.css">
     <script src='https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js'></script>
+    <style>
+        /* 추가적인 스타일 보정 */
+        .hidden { display: none !important; }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -352,6 +356,1379 @@
 
     <div id="toast-notification"></div>
 
-    <script type="module" src="main.js"></script>
+<script>
+/** 
+ * [통합 스크립트] 
+ * 모듈 import 오류(CORS) 방지를 위해 모든 JS를 하나로 합쳤습니다.
+ */
+
+// ========================
+// 1. DATA (data.js)
+// ========================
+let MEM_RECORDS = [];
+let MEM_LOCATIONS = {};
+let MEM_FARES = {};
+let MEM_CENTERS = [];
+let MEM_DISTANCES = {};
+let MEM_COSTS = {};
+let MEM_EXPENSE_ITEMS = [];
+
+function loadAllData() {
+    try {
+        const records = JSON.parse(localStorage.getItem('records')) || [];
+        MEM_RECORDS = Array.isArray(records) ? records : [];
+
+        const locs = JSON.parse(localStorage.getItem('saved_locations')) || {};
+        MEM_LOCATIONS = locs;
+
+        const fares = JSON.parse(localStorage.getItem('saved_fares')) || {};
+        MEM_FARES = fares;
+
+        const centers = JSON.parse(localStorage.getItem('logistics_centers')) || [];
+        MEM_CENTERS = Array.isArray(centers) ? centers : [];
+        if (MEM_CENTERS.length === 0) MEM_CENTERS.push('안성', '안산', '용인', '이천', '인천');
+        MEM_CENTERS.sort(); 
+
+        const dists = JSON.parse(localStorage.getItem('saved_distances')) || {};
+        MEM_DISTANCES = dists;
+
+        const costs = JSON.parse(localStorage.getItem('saved_costs')) || {};
+        MEM_COSTS = costs;
+
+        const items = JSON.parse(localStorage.getItem('saved_expense_items')) || [];
+        MEM_EXPENSE_ITEMS = Array.isArray(items) ? items : [];
+
+        syncHistoryToAutocompleteDB();
+    } catch (e) {
+        console.error("데이터 로드 중 오류:", e);
+    }
+}
+
+function saveData() {
+    MEM_RECORDS.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    localStorage.setItem('records', JSON.stringify(MEM_RECORDS));
+    localStorage.setItem('saved_locations', JSON.stringify(MEM_LOCATIONS));
+    localStorage.setItem('saved_fares', JSON.stringify(MEM_FARES));
+    
+    MEM_CENTERS.sort();
+    localStorage.setItem('logistics_centers', JSON.stringify(MEM_CENTERS));
+    
+    localStorage.setItem('saved_distances', JSON.stringify(MEM_DISTANCES));
+    localStorage.setItem('saved_costs', JSON.stringify(MEM_COSTS));
+    localStorage.setItem('saved_expense_items', JSON.stringify(MEM_EXPENSE_ITEMS));
+}
+
+function updateLocationData(name, address, memo) {
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!MEM_CENTERS.includes(trimmed)) {
+        MEM_CENTERS.push(trimmed);
+        MEM_CENTERS.sort(); 
+    }
+    if (address || memo) {
+        MEM_LOCATIONS[trimmed] = { 
+            ...(MEM_LOCATIONS[trimmed] || {}), 
+            address: address || (MEM_LOCATIONS[trimmed]?.address || ''), 
+            memo: memo || (MEM_LOCATIONS[trimmed]?.memo || '') 
+        };
+    }
+    saveData();
+}
+
+function updateExpenseItemData(item) {
+    if (!item) return;
+    const trimmed = item.trim();
+    if (!MEM_EXPENSE_ITEMS.includes(trimmed)) {
+        MEM_EXPENSE_ITEMS.push(trimmed);
+        MEM_EXPENSE_ITEMS.sort();
+        saveData();
+    }
+}
+
+function syncHistoryToAutocompleteDB() {
+    let updated = false;
+    MEM_RECORDS.forEach(r => {
+        if (r.type === '화물운송' && r.from && r.to) {
+            const key = `${r.from.trim()}-${r.to.trim()}`;
+            if (r.income > 0 && !MEM_FARES[key]) { MEM_FARES[key] = r.income; updated = true; }
+            if (r.distance > 0 && !MEM_DISTANCES[key]) { MEM_DISTANCES[key] = r.distance; updated = true; }
+            if (r.cost > 0 && !MEM_COSTS[key]) { MEM_COSTS[key] = r.cost; updated = true; }
+        }
+    });
+    if (updated) saveData();
+}
+
+function addRecord(record) {
+    if (record.type === '화물운송' && record.from && record.to) {
+        const key = `${record.from}-${record.to}`;
+        if(record.income > 0) MEM_FARES[key] = record.income;
+        if(record.distance > 0) MEM_DISTANCES[key] = record.distance;
+        if(record.cost > 0) MEM_COSTS[key] = record.cost;
+    }
+    MEM_RECORDS.push(record);
+    saveData();
+}
+
+function removeRecord(id) {
+    const idx = MEM_RECORDS.findIndex(r => r.id === id);
+    if(idx > -1) {
+        MEM_RECORDS.splice(idx, 1);
+        saveData();
+    }
+}
+
+// ========================
+// 2. UTILS (utils.js)
+// ========================
+const getTodayString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getCurrentTimeString = () => {
+    const d = new Date();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+};
+
+const formatToManwon = (val) => isNaN(val) ? '0' : Math.round(val / 10000).toLocaleString('ko-KR');
+
+function showToast(msg) {
+    const toast = document.getElementById('toast-notification');
+    if(toast){
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 1500);
+    }
+}
+
+function copyTextToClipboard(text, msg) {
+    if (!navigator.clipboard) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); showToast(msg || '복사되었습니다.'); } 
+        catch (e) { console.error(e); }
+        document.body.removeChild(ta);
+        return;
+    }
+    navigator.clipboard.writeText(text).then(() => showToast(msg || '복사되었습니다.'))
+    .catch(err => console.log('복사 실패:', err));
+}
+
+function getStatisticalDate(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return dateStr;
+    const hour = parseInt(timeStr.split(':')[0], 10);
+    if (hour >= 4) return dateStr;
+    const parts = dateStr.split('-'); 
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1; 
+    const d = parseInt(parts[2], 10);
+    const dateObj = new Date(y, m, d, 12, 0, 0);
+    dateObj.setDate(dateObj.getDate() - 1); 
+    const newY = dateObj.getFullYear();
+    const newM = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const newD = String(dateObj.getDate()).padStart(2, '0');
+    return `${newY}-${newM}-${newD}`;
+}
+
+// ========================
+// 3. STATS (stats.js)
+// ========================
+let displayedSubsidyCount = 0;
+
+function safeInt(value) {
+    if (!value) return 0;
+    const num = parseInt(String(value).replace(/,/g, ''), 10);
+    return isNaN(num) ? 0 : num;
+}
+
+function safeFloat(value) {
+    if (!value) return 0;
+    const num = parseFloat(String(value).replace(/,/g, ''));
+    return isNaN(num) ? 0 : num;
+}
+
+function calculateTotalDuration(records) {
+    const sorted = [...records].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    let totalMinutes = 0;
+    if (sorted.length < 2) return '0h 0m';
+    for (let i = 1; i < sorted.length; i++) {
+        const curr = new Date(`${sorted[i].date}T${sorted[i].time}`);
+        const prev = new Date(`${sorted[i-1].date}T${sorted[i-1].time}`);
+        if (sorted[i-1].type !== '운행종료') {
+            totalMinutes += (curr - prev) / 60000;
+        }
+    }
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = Math.round(totalMinutes % 60);
+    return `${hours}h ${minutes}m`;
+}
+
+function createSummaryHTML(title, records) {
+    const validRecords = records.filter(r => r.type !== '운행취소' && r.type !== '운행종료');
+    let totalIncome = 0, totalExpense = 0, totalDistance = 0, totalTripCount = 0;
+    let totalFuelCost = 0, totalFuelLiters = 0;
+    
+    validRecords.forEach(r => {
+        totalIncome += safeInt(r.income);
+        totalExpense += safeInt(r.cost);
+        if (r.type === '주유소') { 
+            totalFuelCost += safeInt(r.cost); 
+            totalFuelLiters += safeFloat(r.liters); 
+        }
+        if (['화물운송'].includes(r.type)) { 
+            totalDistance += safeFloat(r.distance); 
+            totalTripCount++; 
+        }
+    });
+
+    const netIncome = totalIncome - totalExpense;
+    
+    const metrics = [
+        { label: '수입', value: formatToManwon(totalIncome), unit: ' 만원', className: 'income' },
+        { label: '지출', value: formatToManwon(totalExpense), unit: ' 만원', className: 'cost' },
+        { label: '정산', value: formatToManwon(netIncome), unit: ' 만원', className: 'net' },
+        { label: '운행거리', value: totalDistance.toFixed(1), unit: ' km' },
+        { label: '운행건수', value: totalTripCount, unit: ' 건' },
+        { label: '주유금액', value: formatToManwon(totalFuelCost), unit: ' 만원', className: 'cost' },
+        { label: '주유리터', value: totalFuelLiters.toFixed(2), unit: ' L' },
+    ];
+    let itemsHtml = metrics.map(m => `<div class="summary-item"><span class="summary-label">${m.label}</span><span class="summary-value ${m.className || ''} hidden">${m.value}${m.unit}</span></div>`).join('');
+    return `<strong>${title}</strong><div class="summary-toggle-grid" onclick="window.toggleAllSummaryValues(this)">${itemsHtml}</div>`;
+}
+
+function displayTodayRecords(date) {
+    const todayTbody = document.querySelector('#today-records-table tbody');
+    const todaySummaryDiv = document.getElementById('today-summary');
+    
+    const dayRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time) === date)
+                                  .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    
+    if(todayTbody) todayTbody.innerHTML = '';
+    const displayList = dayRecords.filter(r => r.type !== '운행종료');
+
+    displayList.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.onclick = () => editRecord(r.id);
+
+        let timeDisplay = r.time;
+        if(r.date !== date) { 
+            timeDisplay = `<span style="font-size:0.8em; color:#888;">(익일)</span> ${r.time}`;
+        }
+
+        let money = '';
+        const inc = safeInt(r.income);
+        const cst = safeInt(r.cost);
+
+        if(inc > 0) money += `<span class="income">+${formatToManwon(inc)}</span> `;
+        if(cst > 0) money += `<span class="cost">-${formatToManwon(cst)}</span>`;
+        if(money === '') money = '0'; 
+
+        const isTransport = (r.type === '화물운송' || r.type === '대기' || r.type === '운행취소');
+
+        if (isTransport) {
+            let endTime = '진행중';
+            let duration = '-';
+
+            const idx = MEM_RECORDS.findIndex(item => item.id === r.id);
+            if (idx > -1 && idx < MEM_RECORDS.length - 1) {
+                const next = MEM_RECORDS[idx + 1];
+                if (next.date !== r.date) {
+                    const monthDay = next.date.substring(5);
+                    endTime = `<span style="font-size:0.8em; color:#888;">(${monthDay})</span><br>${next.time}`;
+                } else {
+                    endTime = next.time;
+                }
+
+                const startObj = new Date(`${r.date}T${r.time}`);
+                const endObj = new Date(`${next.date}T${next.time}`);
+                const diff = endObj - startObj;
+                
+                if (diff >= 0) {
+                    const h = Math.floor(diff / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    duration = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                }
+            }
+
+            const fromVal = (r.from||'').replace(/"/g, '&quot;');
+            const toVal = (r.to||'').replace(/"/g, '&quot;');
+            
+            const fromLoc = MEM_LOCATIONS[r.from] || {};
+            const toLoc = MEM_LOCATIONS[r.to] || {};
+            
+            let fromCell = `<span class="location-clickable" data-center="${fromVal}">${r.from || ''}</span>`;
+            if (fromLoc.memo && fromLoc.memo.trim() !== '') {
+                fromCell += `<span class="table-memo">${fromLoc.memo}</span>`;
+            }
+            
+            let toCell = `<span class="location-clickable" data-center="${toVal}">${r.to || ''}</span>`;
+            if (toLoc.memo && toLoc.memo.trim() !== '') {
+                toCell += `<span class="table-memo">${toLoc.memo}</span>`;
+            }
+            
+            let noteCell = '';
+            if(r.distance) noteCell = `<span class="note">${safeFloat(r.distance)} km</span>`;
+            if(r.type === '대기') noteCell = `<span class="note">대기중</span>`;
+            if(r.type === '운행취소') noteCell = `<span class="note cancelled">취소됨</span>`;
+
+            tr.innerHTML = `
+                <td data-label="시작">${timeDisplay}</td>
+                <td data-label="종료">${endTime}</td>
+                <td data-label="소요">${duration}</td>
+                <td data-label="상차">${fromCell}</td>
+                <td data-label="하차">${toCell}</td>
+                <td data-label="비고">${noteCell}</td>
+                <td data-label="금액">${money}</td>
+            `;
+        } else {
+            const detail = r.expenseItem || r.supplyItem || r.brand || '';
+            const content = `<span style="font-weight:bold; color:#555;">[${r.type}]</span>&nbsp;&nbsp;${detail}`;
+            
+            tr.innerHTML = `
+                <td data-label="시작">${timeDisplay}</td>
+                <td colspan="5" data-label="" style="color:#333;">${content}</td>
+                <td data-label="금액">${money}</td>
+            `;
+        }
+        
+        if(todayTbody) todayTbody.appendChild(tr);
+    });
+    if(todaySummaryDiv) todaySummaryDiv.innerHTML = createSummaryHTML('오늘의 기록 (04시 기준)', dayRecords);
+}
+
+function displaySubsidyRecords(append = false) {
+    const subsidyRecordsList = document.getElementById('subsidy-records-list');
+    const subsidyLoadMoreContainer = document.getElementById('subsidy-load-more-container');
+    const fuelRecords = MEM_RECORDS.filter(r => r.type === '주유소').sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+    
+    if (!append) { 
+        displayedSubsidyCount = 0; 
+        if(subsidyRecordsList) subsidyRecordsList.innerHTML = ''; 
+    }
+    
+    if (fuelRecords.length === 0) { 
+        if(subsidyRecordsList) subsidyRecordsList.innerHTML = '<p class="note" style="text-align:center; padding:1em;">주유 내역이 없습니다.</p>'; 
+        if(subsidyLoadMoreContainer) subsidyLoadMoreContainer.innerHTML = ''; 
+        return; 
+    }
+    
+    const nextBatch = fuelRecords.slice(displayedSubsidyCount, displayedSubsidyCount + 10);
+    nextBatch.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'center-item'; 
+        div.style.marginBottom = '5px';
+        div.innerHTML = `
+            <div class="info">
+                <span class="center-name">${r.date} <span class="note">(${r.brand || '기타'})</span></span>
+                <span style="font-weight:bold;">${formatToManwon(safeInt(r.cost))} 만원</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:0.9em; color:#555;">
+                <span>주유량: ${parseFloat(r.liters).toFixed(2)} L</span>
+                <span>단가: ${r.unitPrice} 원</span>
+            </div>`;
+        if(subsidyRecordsList) subsidyRecordsList.appendChild(div);
+    });
+    
+    displayedSubsidyCount += nextBatch.length;
+    
+    if (displayedSubsidyCount < fuelRecords.length && subsidyLoadMoreContainer) { 
+        subsidyLoadMoreContainer.innerHTML = '<button class="load-more-btn" style="margin-top:10px; padding:10px;">▼ 더 보기</button>'; 
+        subsidyLoadMoreContainer.querySelector('button').onclick = () => displaySubsidyRecords(true); 
+    } else if(subsidyLoadMoreContainer) { 
+        subsidyLoadMoreContainer.innerHTML = ''; 
+    }
+}
+
+function displayDailyRecords() {
+    const yearSelect = document.getElementById('daily-year-select');
+    const monthSelect = document.getElementById('daily-month-select');
+    if(!yearSelect || !monthSelect) return;
+
+    const year = yearSelect.value;
+    const month = monthSelect.value;
+    const selectedPeriod = `${year}-${month}`;
+    const dailyTbody = document.querySelector('#daily-summary-table tbody');
+    const dailySummaryDiv = document.getElementById('daily-summary');
+    const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(selectedPeriod));
+    
+    if(dailyTbody) dailyTbody.innerHTML = '';
+    if(dailySummaryDiv) {
+        dailySummaryDiv.classList.remove('hidden');
+        dailySummaryDiv.innerHTML = createSummaryHTML(`${parseInt(month)}월 총계 (04시 기준)`, monthRecords);
+    }
+    const recordsByDate = {};
+    monthRecords.forEach(r => {
+        const statDate = getStatisticalDate(r.date, r.time);
+        if(!recordsByDate[statDate]) recordsByDate[statDate] = { records: [], income: 0, expense: 0, distance: 0, tripCount: 0 };
+        recordsByDate[statDate].records.push(r);
+    });
+    Object.keys(recordsByDate).sort().reverse().forEach(date => {
+        const dayData = recordsByDate[date];
+        const transport = dayData.records.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
+        let inc = 0, exp = 0, dist = 0, count = 0;
+        dayData.records.forEach(r => {
+            if(r.type !== '운행종료' && r.type !== '운행취소') { inc += safeInt(r.income); exp += safeInt(r.cost); }
+            if(r.type === '화물운송') { dist += safeFloat(r.distance); count++; }
+        });
+        if (count === 0) return;
+        const tr = document.createElement('tr');
+        if(date === getTodayString()) tr.style.fontWeight = 'bold';
+        tr.innerHTML = `<td data-label="일">${parseInt(date.substring(8,10))}일</td><td data-label="수입"><span class="income">${formatToManwon(inc)}</span></td><td data-label="지출"><span class="cost">${formatToManwon(exp)}</span></td><td data-label="정산"><strong>${formatToManwon(inc-exp)}</strong></td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td><td data-label="관리"><button class="edit-btn" onclick="window.viewDateDetails('${date}')">상세</button></td>`;
+        if(dailyTbody) dailyTbody.appendChild(tr);
+    });
+}
+
+function displayWeeklyRecords() {
+    const yearSelect = document.getElementById('weekly-year-select');
+    const monthSelect = document.getElementById('weekly-month-select');
+    if(!yearSelect || !monthSelect) return;
+
+    const year = yearSelect.value;
+    const month = monthSelect.value;
+    const selectedPeriod = `${year}-${month}`;
+    const weeklyTbody = document.querySelector('#weekly-summary-table tbody');
+    const weeklySummaryDiv = document.getElementById('weekly-summary');
+    const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(selectedPeriod));
+    
+    if(weeklyTbody) weeklyTbody.innerHTML = '';
+    if(weeklySummaryDiv) weeklySummaryDiv.innerHTML = createSummaryHTML(`${parseInt(month)}월 주별`, monthRecords);
+    
+    const weeks = {};
+    monthRecords.forEach(r => {
+        const statDate = getStatisticalDate(r.date, r.time);
+        const d = new Date(statDate);
+        const w = Math.ceil((d.getDate() + (new Date(d.getFullYear(), d.getMonth(), 1).getDay())) / 7);
+        if(!weeks[w]) weeks[w] = [];
+        weeks[w].push(r);
+    });
+    Object.keys(weeks).forEach(w => {
+        const data = weeks[w];
+        const transport = data.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
+        let inc = 0, exp = 0, dist = 0, count = 0;
+        data.forEach(r => { 
+            if(r.type!=='운행종료'&&r.type!=='운행취소'){inc+=safeInt(r.income);exp+=safeInt(r.cost);} 
+            if(r.type==='화물운송'){dist+=safeFloat(r.distance);count++;} 
+        });
+        const dates = data.map(r => new Date(getStatisticalDate(r.date, r.time)).getDate());
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td data-label="주차">${w}주차</td><td data-label="기간">${Math.min(...dates)}일~${Math.max(...dates)}일</td><td data-label="수입">${formatToManwon(inc)}</td><td data-label="지출">${formatToManwon(exp)}</td><td data-label="정산">${formatToManwon(inc-exp)}</td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td>`;
+        if(weeklyTbody) weeklyTbody.appendChild(tr);
+    });
+}
+
+function displayMonthlyRecords() {
+    const yearSelect = document.getElementById('monthly-year-select');
+    if(!yearSelect) return;
+    const year = yearSelect.value;
+    const monthlyTbody = document.querySelector('#monthly-summary-table tbody');
+    const monthlyYearlySummaryDiv = document.getElementById('monthly-yearly-summary');
+    const yearRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(year));
+    
+    if(monthlyYearlySummaryDiv) monthlyYearlySummaryDiv.innerHTML = createSummaryHTML(`${year}년`, yearRecords);
+    if(monthlyTbody) monthlyTbody.innerHTML = '';
+    
+    const months = {};
+    yearRecords.forEach(r => { 
+        const statDate = getStatisticalDate(r.date, r.time);
+        const m = statDate.substring(0,7); 
+        if(!months[m]) months[m]={records:[]}; 
+        months[m].records.push(r); 
+    });
+    Object.keys(months).sort().reverse().forEach(m => {
+        const data = months[m];
+        const transport = data.records.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
+        let inc=0,exp=0,dist=0,count=0;
+         data.records.forEach(r => { 
+            if(r.type!=='운행종료'&&r.type!=='운행취소'){inc+=safeInt(r.income);exp+=safeInt(r.cost);} 
+            if(r.type==='화물운송'){dist+=safeFloat(r.distance);count++;} 
+        });
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td data-label="월">${parseInt(m.substring(5))}월</td><td data-label="수입">${formatToManwon(inc)}</td><td data-label="지출">${formatToManwon(exp)}</td><td data-label="정산">${formatToManwon(inc-exp)}</td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td>`;
+        if(monthlyTbody) monthlyTbody.appendChild(tr);
+    });
+}
+
+function displayCurrentMonthData() {
+    const now = new Date();
+    let checkDate = new Date();
+    if(checkDate.getHours() < 4) checkDate.setDate(checkDate.getDate() - 1);
+    const currentPeriod = checkDate.toISOString().slice(0, 7); 
+    const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(currentPeriod) && r.type !== '운행취소' && r.type !== '운행종료'); 
+    const titleEl = document.getElementById('current-month-title');
+    if(titleEl) titleEl.textContent = `${parseInt(currentPeriod.split('-')[1])}월 실시간 요약 (04시 기준)`; 
+    let inc = 0, exp = 0, count = 0, dist = 0, liters = 0; 
+    monthRecords.forEach(r => { 
+        inc += safeInt(r.income); exp += safeInt(r.cost); 
+        if(r.type === '화물운송') { count++; dist += safeFloat(r.distance); } 
+        if(r.type === '주유소') liters += safeFloat(r.liters); 
+    }); 
+    const days = new Set(monthRecords.map(r => getStatisticalDate(r.date, r.time))).size; 
+    const net = inc - exp; 
+    const avg = liters > 0 && dist > 0 ? (dist/liters).toFixed(2) : 0; 
+    const costKm = dist > 0 ? Math.round(exp/dist) : 0; 
+    
+    if(document.getElementById('current-month-operating-days')) document.getElementById('current-month-operating-days').textContent = `${days} 일`; 
+    if(document.getElementById('current-month-trip-count')) document.getElementById('current-month-trip-count').textContent = `${count} 건`; 
+    if(document.getElementById('current-month-total-mileage')) document.getElementById('current-month-total-mileage').textContent = `${dist.toFixed(1)} km`; 
+    if(document.getElementById('current-month-income')) document.getElementById('current-month-income').textContent = `${formatToManwon(inc)} 만원`; 
+    if(document.getElementById('current-month-expense')) document.getElementById('current-month-expense').textContent = `${formatToManwon(exp)} 만원`; 
+    if(document.getElementById('current-month-net-income')) document.getElementById('current-month-net-income').textContent = `${formatToManwon(net)} 만원`; 
+    if(document.getElementById('current-month-avg-economy')) document.getElementById('current-month-avg-economy').textContent = `${avg} km/L`; 
+    if(document.getElementById('current-month-cost-per-km')) document.getElementById('current-month-cost-per-km').textContent = `${costKm.toLocaleString()} 원`; 
+    
+    const limit = parseFloat(localStorage.getItem("fuel_subsidy_limit")) || 0; 
+    const remain = limit - liters; 
+    const pct = limit > 0 ? Math.min(100, 100 * liters / limit).toFixed(1) : 0; 
+    const subSum = document.getElementById('subsidy-summary');
+    if(subSum) subSum.innerHTML = `<div class="progress-label">월 한도: ${limit.toLocaleString()} L | 사용: ${liters.toFixed(1)} L | 잔여: ${remain.toFixed(1)} L</div><div class="progress-bar-container"><div class="progress-bar progress-bar-used" style="width: ${pct}%;"></div></div>`; 
+}
+
+function displayCumulativeData() {
+    const records = MEM_RECORDS.filter(r => r.type !== '운행취소' && r.type !== '운행종료');
+    let inc = 0, exp = 0, count = 0, dist = 0, liters = 0;
+    records.forEach(r => {
+        inc += safeInt(r.income); exp += safeInt(r.cost);
+        if(r.type === '주유소') liters += safeFloat(r.liters);
+        if(r.type === '화물운송') { count++; dist += safeFloat(r.distance); }
+    });
+    const correction = parseFloat(localStorage.getItem("mileage_correction")) || 0;
+    const totalDist = dist + correction;
+    const net = inc - exp;
+    const avg = liters > 0 && totalDist > 0 ? (totalDist/liters).toFixed(2) : 0;
+    const costKm = totalDist > 0 ? Math.round(exp/totalDist) : 0;
+    const days = new Set(records.map(r => getStatisticalDate(r.date, r.time))).size;
+    
+    if(document.getElementById('cumulative-operating-days')) document.getElementById('cumulative-operating-days').textContent = `${days} 일`;
+    if(document.getElementById('cumulative-trip-count')) document.getElementById('cumulative-trip-count').textContent = `${count} 건`;
+    if(document.getElementById('cumulative-total-mileage')) document.getElementById('cumulative-total-mileage').textContent = `${Math.round(totalDist).toLocaleString()} km`;
+    if(document.getElementById('cumulative-income')) document.getElementById('cumulative-income').textContent = `${formatToManwon(inc)} 만원`;
+    if(document.getElementById('cumulative-expense')) document.getElementById('cumulative-expense').textContent = `${formatToManwon(exp)} 만원`;
+    if(document.getElementById('cumulative-net-income')) document.getElementById('cumulative-net-income').textContent = `${formatToManwon(net)} 만원`;
+    if(document.getElementById('cumulative-avg-economy')) document.getElementById('cumulative-avg-economy').textContent = `${avg} km/L`;
+    if(document.getElementById('cumulative-cost-per-km')) document.getElementById('cumulative-cost-per-km').textContent = `${costKm.toLocaleString()} 원`;
+    renderMileageSummary();
+}
+
+function renderMileageSummary(period = 'monthly') {
+    const validRecords = MEM_RECORDS.filter(r => ['화물운송'].includes(r.type));
+    let summaryData = {};
+    if (period === 'monthly') {
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(); d.setMonth(d.getMonth() - i);
+            const k = d.toISOString().slice(0, 7);
+            summaryData[k] = 0;
+        }
+        validRecords.forEach(r => { 
+            const statDate = getStatisticalDate(r.date, r.time);
+            const k = statDate.substring(0, 7); 
+            if (summaryData.hasOwnProperty(k)) summaryData[k]++; 
+        });
+    } else {
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - (i * 7));
+            const k = d.toISOString().slice(0, 10);
+            summaryData[k] = 0;
+        }
+        validRecords.forEach(r => {
+            const statDate = getStatisticalDate(r.date, r.time);
+            const d = new Date(statDate); 
+            d.setDate(d.getDate() - d.getDay() + 1);
+            const k = d.toISOString().slice(0, 10);
+            if (summaryData.hasOwnProperty(k)) summaryData[k]++;
+        });
+    }
+    let h = '';
+    for (const k in summaryData) {
+        h += `<div class="metric-card"><span class="metric-label">${k}</span><span class="metric-value">${summaryData[k]} 건</span></div>`;
+    }
+    if(document.getElementById('mileage-summary-cards')) document.getElementById('mileage-summary-cards').innerHTML = h;
+}
+
+function generatePrintView(year, month, period, isDetailed) {
+    const sDay = period === 'second' ? 16 : 1;
+    const eDay = period === 'first' ? 15 : 31;
+    const periodStr = period === 'full' ? '1일 ~ 말일' : `${sDay}일 ~ ${eDay===15?15:'말'}일`;
+    
+    const target = MEM_RECORDS.filter(r => { 
+        const statDate = getStatisticalDate(r.date, r.time);
+        const d = new Date(statDate); 
+        return statDate.startsWith(`${year}-${month}`) && d.getDate() >= sDay && d.getDate() <= eDay && r.type !== '운행종료'; 
+    }).sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+    
+    const transportList = target.filter(r => ['화물운송', '대기', '운행취소'].includes(r.type));
+    const fuelList = target.filter(r => r.type === '주유소');
+    const expenseList = target.filter(r => ['지출', '소모품'].includes(r.type));
+    const incomeList = target.filter(r => r.type === '수입');
+
+    let transInc = 0, transExp = 0, transDist = 0;
+    transportList.forEach(r => {
+        transInc += safeInt(r.income);
+        transExp += safeInt(r.cost);
+        transDist += safeFloat(r.distance);
+    });
+
+    let fuelTotalCost = 0, fuelTotalSubsidy = 0;
+    fuelList.forEach(r => {
+        fuelTotalCost += safeInt(r.cost);
+        fuelTotalSubsidy += safeInt(r.subsidy);
+    });
+    const fuelNetCost = fuelTotalCost - fuelTotalSubsidy;
+
+    let genExp = 0;
+    expenseList.forEach(r => genExp += safeInt(r.cost));
+
+    let genInc = 0;
+    incomeList.forEach(r => genInc += safeInt(r.income));
+
+    const totalRevenue = transInc + genInc; 
+    const totalSpend = transExp + genExp + fuelNetCost; 
+    const finalProfit = totalRevenue - totalSpend; 
+
+    const workDays = new Set(
+        transportList.map(r => getStatisticalDate(r.date, r.time))
+    ).size;
+
+    const w = window.open('','_blank');
+    
+    let h = `
+    <html>
+    <head>
+        <title>운송내역서</title>
+        <style>
+            body { font-family: sans-serif; margin: 20px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; margin-bottom: 20px; }
+            th, td { border: 1px solid #ccc; padding: 6px; text-align: center; word-wrap: break-word; }
+            th { background: #eee; }
+            .summary { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; background-color: #f9f9f9; line-height: 1.6; }
+            .date-border { border-top: 2px solid #000 !important; }
+            .left-align { text-align: left; padding-left: 5px; }
+            .col-date { width: 80px; }
+            .col-location { width: 120px; }
+            .col-note { width: 100px; }
+            h3 { margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 30px; }
+            .txt-red { color: #dc3545; font-weight: bold; }
+            .txt-blue { color: #007bff; font-weight: bold; }
+            .txt-green { color: #28a745; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <h2>${year}년 ${month}월 ${periodStr} 운송 기록 (04시 기준)</h2>
+        
+        <div class="summary">
+            <p><strong>[요약]</strong> 근무일: ${workDays}일 | 운행건수: ${transportList.length}건 | 운행거리: ${transDist.toFixed(1)}km</p>
+            <hr style="border:0; border-top:1px dashed #ccc; margin:10px 0;">
+            <p><span class="txt-blue">[ + ] 총 수입: ${totalRevenue.toLocaleString()} 원</span> (운송: ${transInc.toLocaleString()} + 기타: ${genInc.toLocaleString()})</p>
+            <p><span class="txt-red">[ - ] 총 지출: ${(transExp + genExp).toLocaleString()} 원</span> (운송지출: ${transExp.toLocaleString()} + 일반지출: ${genExp.toLocaleString()})</p>
+            <p><span class="txt-red">[ - ] 실 주유비: ${fuelNetCost.toLocaleString()} 원</span> (주유금액: ${fuelTotalCost.toLocaleString()} - 보조금: ${fuelTotalSubsidy.toLocaleString()})</p>
+            <hr style="border:0; border-top:2px solid #333; margin:10px 0;">
+            <p class="txt-green" style="font-size: 1.4em;">[ = ] 최종 순수익: ${finalProfit.toLocaleString()} 원</p>
+        </div>
+
+        <h3>1. 운송 내역</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-date">날짜</th>
+                    <th class="col-location">상차지</th>
+                    <th class="col-location">하차지</th>
+                    <th class="col-note">내용</th>
+                    ${isDetailed ? '<th>거리</th><th>수입</th>' : ''}
+                </tr>
+            </thead>
+            <tbody>`;
+            
+    if (transportList.length === 0) h += `<tr><td colspan="${isDetailed?6:4}">내역 없음</td></tr>`;
+    
+    let lastDate = '';
+    transportList.forEach(r => {
+        const statDate = getStatisticalDate(r.date, r.time);
+        let borderClass = ''; 
+        if(lastDate !== '' && lastDate !== statDate) borderClass = 'class="date-border"'; 
+        lastDate = statDate;
+
+        let dateDisplay = statDate.substring(5);
+        let from = r.from || '';
+        let to = r.to || '';
+        let desc = r.type;
+        if(r.type === '대기') desc = '대기';
+        if(r.type === '운행취소') desc = '취소';
+
+        h += `<tr ${borderClass}>
+                <td>${dateDisplay}</td>
+                <td class="left-align">${from}</td>
+                <td class="left-align">${to}</td>
+                <td>${desc}</td>
+                ${isDetailed ? `<td>${safeFloat(r.distance)||'-'}</td><td>${safeInt(r.income).toLocaleString()}</td>` : ''}
+              </tr>`;
+    });
+    h += `</tbody></table>`;
+
+    h += `<h3>2. 주유 및 정비 내역</h3>`;
+    if (fuelList.length > 0) {
+        h += `<table>
+                <thead>
+                    <tr>
+                        <th class="col-date">날짜</th>
+                        <th>주유리터</th>
+                        <th>주유단가</th>
+                        <th>주유금액</th>
+                        <th>보조금액</th>
+                        <th>실결제금액</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        
+        fuelList.forEach(r => {
+             const statDate = getStatisticalDate(r.date, r.time);
+             let dateDisplay = statDate.substring(5);
+             if(r.date !== statDate) dateDisplay += ' (익일)';
+             
+             const cost = safeInt(r.cost);
+             const subsidy = safeInt(r.subsidy);
+             const netCost = cost - subsidy;
+
+             h += `<tr>
+                    <td>${dateDisplay}</td>
+                    <td>${safeFloat(r.liters).toFixed(2)} L</td>
+                    <td>${safeInt(r.unitPrice).toLocaleString()} 원</td>
+                    <td>${cost.toLocaleString()} 원</td>
+                    <td style="color:red;">${subsidy > 0 ? '-' + subsidy.toLocaleString() : '0'} 원</td>
+                    <td style="font-weight:bold;">${netCost.toLocaleString()} 원</td>
+                   </tr>`;
+        });
+        h += `</tbody></table>`;
+    } else {
+        h += `<p>내역 없음</p>`;
+    }
+
+    h += `<h3>3. 지출 내역</h3>`;
+    if (expenseList.length > 0) {
+        h += `<table>
+                <thead>
+                    <tr>
+                        <th class="col-date">날짜</th>
+                        <th>내용 (적요)</th>
+                        <th>지출금액</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        expenseList.forEach(r => {
+            const statDate = getStatisticalDate(r.date, r.time);
+            let dateDisplay = statDate.substring(5);
+            let item = r.expenseItem || r.supplyItem || r.type;
+            
+            h += `<tr>
+                    <td>${dateDisplay}</td>
+                    <td class="left-align">${item}</td>
+                    <td>${safeInt(r.cost).toLocaleString()} 원</td>
+                  </tr>`;
+        });
+        h += `</tbody></table>`;
+    } else {
+        h += `<p>내역 없음</p>`;
+    }
+
+    h += `<h3>4. 수입 내역</h3>`;
+    if (incomeList.length > 0) {
+        h += `<table>
+                <thead>
+                    <tr>
+                        <th class="col-date">날짜</th>
+                        <th>내용 (적요)</th>
+                        <th>수입금액</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        incomeList.forEach(r => {
+            const statDate = getStatisticalDate(r.date, r.time);
+            let dateDisplay = statDate.substring(5);
+            let item = r.expenseItem || r.type; 
+            
+            h += `<tr>
+                    <td>${dateDisplay}</td>
+                    <td class="left-align">${item}</td>
+                    <td>${safeInt(r.income).toLocaleString()} 원</td>
+                  </tr>`;
+        });
+        h += `</tbody></table>`;
+    } else {
+        h += `<p>내역 없음</p>`;
+    }
+
+    h += `<button onclick="window.print()" style="padding:10px 20px; font-size:1.2em; cursor:pointer;">인쇄하기</button>
+    </body>
+    </html>`;
+    
+    w.document.write(h); 
+    w.document.close();
+}
+
+// ========================
+// 4. UI Logic (ui.js / main.js combined)
+// ========================
+
+function toggleUI() {
+    const typeSelect = document.getElementById('type');
+    const editMode = document.getElementById('edit-mode-indicator');
+    if(!typeSelect || !editMode) return;
+
+    const type = typeSelect.value;
+    const isEditMode = !editMode.classList.contains('hidden');
+
+    ['transport-details', 'fuel-details', 'supply-details', 'expense-details', 'cost-info-fieldset', 'trip-actions', 'general-actions', 'edit-actions'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.classList.add('hidden');
+    });
+    
+    const costWrapper = document.getElementById('cost-wrapper');
+    const incomeWrapper = document.getElementById('income-wrapper');
+    const btnTripCancel = document.getElementById('btn-trip-cancel');
+
+    if (type === '화물운송' || type === '대기') {
+        document.getElementById('transport-details').classList.remove('hidden');
+        document.getElementById('cost-info-fieldset').classList.remove('hidden');
+        if(costWrapper) costWrapper.classList.add('hidden');
+        if(incomeWrapper) incomeWrapper.classList.remove('hidden');
+        if (!isEditMode) {
+            document.getElementById('trip-actions').classList.remove('hidden');
+            if(type === '화물운송' && btnTripCancel) btnTripCancel.classList.remove('hidden');
+        }
+    } else if (type === '수입') {
+        document.getElementById('expense-details').classList.remove('hidden'); 
+        document.getElementById('expense-legend').textContent = "수입 내역";
+        document.getElementById('cost-info-fieldset').classList.remove('hidden');
+        if(incomeWrapper) incomeWrapper.classList.remove('hidden');
+        if(costWrapper) costWrapper.classList.add('hidden');
+        if (!isEditMode) document.getElementById('general-actions').classList.remove('hidden');
+    } else {
+        document.getElementById('cost-info-fieldset').classList.remove('hidden');
+        if(incomeWrapper) incomeWrapper.classList.add('hidden');
+        if(costWrapper) costWrapper.classList.remove('hidden');
+        
+        if (type === '주유소') {
+            document.getElementById('fuel-details').classList.remove('hidden');
+            if (!isEditMode) document.getElementById('general-actions').classList.remove('hidden');
+        } else if (type === '소모품') {
+            document.getElementById('supply-details').classList.remove('hidden');
+            if (!isEditMode) document.getElementById('general-actions').classList.remove('hidden');
+        } else if (type === '지출') {
+            document.getElementById('expense-details').classList.remove('hidden');
+            document.getElementById('expense-legend').textContent = "지출 내역";
+            if (!isEditMode) document.getElementById('general-actions').classList.remove('hidden');
+        }
+    }
+
+    if (isEditMode) {
+        document.getElementById('edit-actions').classList.remove('hidden');
+        const btnEditEnd = document.getElementById('btn-edit-end-trip');
+        const btnEditStart = document.getElementById('btn-edit-start-trip');
+        
+        if (type === '주유소' || type === '소모품' || type === '지출' || type === '수입') {
+            if(btnEditEnd) btnEditEnd.classList.add('hidden');
+            if(btnEditStart) btnEditStart.classList.add('hidden');
+        } else {
+            if(btnEditEnd) btnEditEnd.classList.remove('hidden');
+            if(btnEditStart) btnEditStart.classList.remove('hidden');
+        }
+    }
+}
+
+function getFormDataWithoutTime() {
+    const fromCenter = document.getElementById('from-center');
+    const toCenter = document.getElementById('to-center');
+    const fromValue = fromCenter ? fromCenter.value.trim() : '';
+    const toValue = toCenter ? toCenter.value.trim() : '';
+    
+    if(fromValue) updateLocationData(fromValue);
+    if(toValue) updateLocationData(toValue);
+
+    return {
+        type: document.getElementById('type').value,
+        from: fromValue,
+        to: toValue,
+        distance: parseFloat(document.getElementById('manual-distance').value) || 0,
+        cost: Math.round((parseFloat(document.getElementById('cost').value) || 0) * 10000),
+        income: Math.round((parseFloat(document.getElementById('income').value) || 0) * 10000),
+        liters: parseFloat(document.getElementById('fuel-liters').value) || 0,
+        unitPrice: parseInt(document.getElementById('fuel-unit-price').value) || 0,
+        brand: document.getElementById('fuel-brand').value || '',
+        supplyItem: document.getElementById('supply-item').value || '',
+        mileage: parseInt(document.getElementById('supply-mileage').value) || 0,
+        expenseItem: document.getElementById('expense-item').value || ''
+    };
+}
+
+function resetForm() {
+    document.getElementById('record-form').reset();
+    document.getElementById('edit-id').value = '';
+    document.getElementById('edit-mode-indicator').classList.add('hidden');
+    document.getElementById('date').value = getTodayString();
+    document.getElementById('time').value = getCurrentTimeString();
+    document.getElementById('date').disabled = false;
+    document.getElementById('time').disabled = false;
+    document.getElementById('address-display').innerHTML = '';
+    toggleUI();
+}
+
+function updateAddressDisplay() {
+    const fromValue = document.getElementById('from-center').value;
+    const toValue = document.getElementById('to-center').value;
+    const fromLoc = MEM_LOCATIONS[fromValue] || {};
+    const toLoc = MEM_LOCATIONS[toValue] || {};
+    let html = '';
+    if (fromLoc.address) html += `<div class="address-clickable" data-address="${fromLoc.address}">[상] ${fromLoc.address}</div>`;
+    if (fromLoc.memo) html += `<div class="memo-display">[상] ${fromLoc.memo}</div>`;
+    if (toLoc.address) html += `<div class="address-clickable" data-address="${toLoc.address}">[하] ${toLoc.address}</div>`;
+    if (toLoc.memo) html += `<div class="memo-display">[하] ${toLoc.memo}</div>`;
+    document.getElementById('address-display').innerHTML = html;
+}
+
+function populateCenterDatalist() {
+    document.getElementById('center-list').innerHTML = MEM_CENTERS.map(c => `<option value="${c}"></option>`).join('');
+}
+function populateExpenseDatalist() {
+    document.getElementById('expense-list').innerHTML = MEM_EXPENSE_ITEMS.map(item => `<option value="${item}"></option>`).join('');
+}
+
+function displayCenterList(filter='') {
+    const container = document.getElementById('center-list-container');
+    if(!container) return;
+    container.innerHTML = "";
+    const list = MEM_CENTERS.filter(c => c.includes(filter));
+    if(list.length===0) { container.innerHTML='<p class="note">결과 없음</p>'; return; } 
+    list.forEach(c => {
+        const l = MEM_LOCATIONS[c]||{};
+        const div = document.createElement('div');
+        div.className='center-item';
+        div.innerHTML=`<div class="info"><span class="center-name">${c}</span><div class="action-buttons"><button class="edit-btn">수정</button><button class="delete-btn">삭제</button></div></div>${l.address?`<span class="note">주소: ${l.address}</span>`:''}`;
+        div.querySelector('.edit-btn').onclick = () => {
+            div.innerHTML = `<div class="edit-form"><input class="edit-input" value="${c}"><input class="edit-address-input" value="${l.address||''}"><input class="edit-memo-input" value="${l.memo||''}"><div class="action-buttons"><button class="setting-save-btn">저장</button><button class="cancel-edit-btn">취소</button></div></div>`;
+            div.querySelector('.setting-save-btn').onclick = () => {
+                const nn = div.querySelector('.edit-input').value.trim();
+                const na = div.querySelector('.edit-address-input').value.trim();
+                const nm = div.querySelector('.edit-memo-input').value.trim();
+                if(nn && nn!==c) {
+                    const idx = MEM_CENTERS.indexOf(c); if(idx>-1) MEM_CENTERS.splice(idx,1);
+                    if(!MEM_CENTERS.includes(nn)) MEM_CENTERS.push(nn);
+                    delete MEM_LOCATIONS[c];
+                    MEM_RECORDS.forEach(r => { if(r.from===c) r.from=nn; if(r.to===c) r.to=nn; });
+                    MEM_CENTERS.sort(); saveData();
+                }
+                updateLocationData(nn, na, nm);
+                displayCenterList(document.getElementById('center-search-input').value);
+            };
+            div.querySelector('.cancel-edit-btn').onclick = () => displayCenterList(document.getElementById('center-search-input').value);
+        };
+        div.querySelector('.delete-btn').onclick = () => {
+            if(confirm('삭제?')) {
+                const idx = MEM_CENTERS.indexOf(c);
+                if(idx>-1) MEM_CENTERS.splice(idx,1);
+                delete MEM_LOCATIONS[c];
+                saveData();
+                displayCenterList(document.getElementById('center-search-input').value);
+            }
+        };
+        container.appendChild(div);
+    });
+}
+
+// 2주간 자주 방문한 장소 버튼
+function renderFrequentLocationButtons() {
+    const fromContainer = document.getElementById('top-from-centers');
+    const toContainer = document.getElementById('top-to-centers');
+    if (!fromContainer || !toContainer) return;
+
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    const fromCounts = {}, toCounts = {};
+
+    MEM_RECORDS.forEach(r => {
+        const recordDate = new Date(r.date);
+        if ((r.type === '화물운송' || r.type === '대기') && recordDate >= twoWeeksAgo) {
+            if (r.from) fromCounts[r.from] = (fromCounts[r.from] || 0) + 1;
+            if (r.to) toCounts[r.to] = (toCounts[r.to] || 0) + 1;
+        }
+    });
+
+    const topFrom = Object.entries(fromCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topTo = Object.entries(toCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    const buildButtons = (data, container, targetId) => {
+        container.innerHTML = '';
+        data.forEach(([name]) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'quick-loc-btn';
+            btn.textContent = name;
+            btn.onclick = () => {
+                const input = document.getElementById(targetId);
+                input.value = name;
+                input.dispatchEvent(new Event('input'));
+            };
+            container.appendChild(btn);
+        });
+    };
+    buildButtons(topFrom, fromContainer, 'from-center');
+    buildButtons(topTo, toContainer, 'to-center');
+}
+
+window.viewDateDetails = function(date) { 
+    document.getElementById('today-date-picker').value = date; 
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove("active")); 
+    document.querySelector('.tab-btn[data-view="today"]').classList.add("active"); 
+    document.querySelectorAll('.view-content').forEach(c => c.classList.remove('active')); 
+    document.getElementById("today-view").classList.add("active"); 
+    displayTodayRecords(date); 
+};
+
+window.toggleAllSummaryValues = function(gridElement) { 
+    const items = gridElement.querySelectorAll('.summary-item'); 
+    const isShowing = gridElement.classList.toggle('active'); 
+    items.forEach(item => { 
+        const valueEl = item.querySelector('.summary-value'); 
+        if(isShowing) { item.classList.add('active'); valueEl.classList.remove('hidden'); } 
+        else { item.classList.remove('active'); valueEl.classList.add('hidden'); } 
+    }); 
+};
+
+window.editRecord = function(id) {
+    const r = MEM_RECORDS.find(x => x.id === id);
+    if(!r) return;
+    document.getElementById('date').value = r.date; 
+    document.getElementById('time').value = r.time; 
+    document.getElementById('type').value = r.type;
+    document.getElementById('from-center').value = r.from || ''; 
+    document.getElementById('to-center').value = r.to || '';
+    document.getElementById('manual-distance').value = r.distance || ''; 
+    document.getElementById('income').value = r.income ? (r.income/10000) : ''; 
+    document.getElementById('cost').value = r.cost ? (r.cost/10000) : '';
+    document.getElementById('fuel-brand').value = r.brand || ''; 
+    document.getElementById('fuel-liters').value = r.liters || ''; 
+    document.getElementById('fuel-unit-price').value = r.unitPrice || '';
+    document.getElementById('expense-item').value = r.expenseItem || ''; 
+    document.getElementById('supply-item').value = r.supplyItem || ''; 
+    document.getElementById('supply-mileage').value = r.mileage || '';
+    document.getElementById('edit-id').value = id; 
+    document.getElementById('edit-mode-indicator').classList.remove('hidden');
+    document.getElementById('date').disabled = true; 
+    document.getElementById('time').disabled = true;
+    toggleUI(); 
+    window.scrollTo(0,0);
+}
+
+// ========================
+// 5. INITIALIZATION & EVENTS
+// ========================
+
+function initialSetup() {
+    loadAllData();
+    populateCenterDatalist();
+    populateExpenseDatalist();
+    
+    // 연도/월 초기화
+    const y = new Date().getFullYear();
+    const yrs = []; for(let i=0; i<5; i++) yrs.push(`<option value="${y-i}">${y-i}년</option>`);
+    ['daily-year-select', 'weekly-year-select', 'monthly-year-select', 'print-year-select'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.innerHTML = yrs.join('');
+    });
+    const ms = []; for(let i=1; i<=12; i++) ms.push(`<option value="${i.toString().padStart(2,'0')}">${i}월</option>`);
+    ['daily-month-select', 'weekly-month-select', 'print-month-select'].forEach(id => {
+        const el = document.getElementById(id); if(el) { el.innerHTML = ms.join(''); el.value = (new Date().getMonth()+1).toString().padStart(2,'0'); }
+    });
+
+    const mC = document.getElementById('mileage-correction'); if(mC) mC.value = localStorage.getItem('mileage_correction') || 0;
+    const sL = document.getElementById('subsidy-limit'); if(sL) sL.value = localStorage.getItem('fuel_subsidy_limit') || 0;
+    
+    const todayStr = getTodayString();
+    const nowTime = getCurrentTimeString();
+    document.getElementById('today-date-picker').value = getStatisticalDate(todayStr, nowTime);
+
+    resetForm();
+    updateAllDisplays();
+    setupEventListeners();
+}
+
+function updateAllDisplays() {
+    const targetDate = document.getElementById('today-date-picker').value;
+    displayTodayRecords(targetDate);
+    displayDailyRecords();
+    displayWeeklyRecords();
+    displayMonthlyRecords();
+    renderFrequentLocationButtons();
+}
+
+function setupEventListeners() {
+    // 운행 등록 (시간 미입력 시 현재 폼 값 유지)
+    document.getElementById('btn-register-trip')?.addEventListener('click', () => {
+        const formData = getFormDataWithoutTime();
+        if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
+        addRecord({ 
+            id: Date.now(), 
+            date: document.getElementById('date').value, 
+            time: document.getElementById('time').value, 
+            ...formData 
+        });
+        showToast('등록되었습니다.');
+        resetForm();
+        updateAllDisplays();
+    });
+
+    // 운행 시작 (GPS 시간 강제)
+    document.getElementById('btn-start-trip')?.addEventListener('click', () => {
+        const formData = getFormDataWithoutTime();
+        if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
+        addRecord({ id: Date.now(), date: getTodayString(), time: getCurrentTimeString(), ...formData });
+        showToast('저장되었습니다.');
+        resetForm();
+        document.getElementById('today-date-picker').value = getStatisticalDate(getTodayString(), getCurrentTimeString());
+        updateAllDisplays();
+    });
+
+    // 운행 종료 (GPS 시간 강제)
+    document.getElementById('btn-end-trip')?.addEventListener('click', () => {
+        addRecord({ id: Date.now(), date: getTodayString(), time: getCurrentTimeString(), type: '운행종료', distance: 0, cost: 0, income: 0 });
+        showToast('운행 종료되었습니다.');
+        resetForm();
+        document.getElementById('today-date-picker').value = getStatisticalDate(getTodayString(), getCurrentTimeString());
+        updateAllDisplays();
+    });
+
+    // 운행 취소
+    document.getElementById('btn-trip-cancel')?.addEventListener('click', () => {
+        const formData = getFormDataWithoutTime();
+        addRecord({ id: Date.now(), date: getTodayString(), time: getCurrentTimeString(), ...formData, type: '운행취소' });
+        showToast('저장되었습니다.');
+        resetForm();
+        document.getElementById('today-date-picker').value = getStatisticalDate(getTodayString(), getCurrentTimeString());
+        updateAllDisplays();
+    });
+
+    // 일반 저장
+    document.getElementById('btn-save-general')?.addEventListener('click', () => {
+        const formData = getFormDataWithoutTime();
+        if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
+        if (formData.type === '지출' || formData.type === '수입') { if (formData.expenseItem) updateExpenseItemData(formData.expenseItem); }
+        addRecord({ id: Date.now(), date: document.getElementById('date').value, time: document.getElementById('time').value, ...formData });
+        showToast('저장되었습니다.');
+        populateExpenseDatalist();
+        document.getElementById('today-date-picker').value = getStatisticalDate(document.getElementById('date').value, document.getElementById('time').value);
+        resetForm();
+        updateAllDisplays();
+        if(formData.type === '주유소') displaySubsidyRecords();
+    });
+
+    // 수정 완료
+    document.getElementById('btn-update-record')?.addEventListener('click', () => {
+        const id = parseInt(document.getElementById('edit-id').value);
+        const index = MEM_RECORDS.findIndex(r => r.id === id);
+        if (index > -1) {
+            const original = MEM_RECORDS[index];
+            const formData = getFormDataWithoutTime();
+            if (formData.type === '화물운송' && formData.from && formData.to) {
+                const key = `${formData.from}-${formData.to}`;
+                if(formData.distance > 0) MEM_DISTANCES[key] = formData.distance;
+                if(formData.income > 0) MEM_FARES[key] = formData.income;
+            }
+            if (formData.type === '지출' || formData.type === '수입') { if (formData.expenseItem) updateExpenseItemData(formData.expenseItem); }
+            MEM_RECORDS[index] = { ...original, ...formData, date: original.date, time: original.time }; // 시간 유지
+            saveData();
+            populateExpenseDatalist();
+            showToast('수정 완료.');
+            document.getElementById('today-date-picker').value = getStatisticalDate(original.date, original.time);
+            resetForm();
+            updateAllDisplays();
+            if(formData.type === '주유소') displaySubsidyRecords();
+        }
+    });
+
+    // 현재 시간으로 운행 시작 (수정 모드) [추가]
+    document.getElementById('btn-edit-start-trip')?.addEventListener('click', () => {
+        const nowTime = getCurrentTimeString();
+        const nowDate = getTodayString();
+        const id = parseInt(document.getElementById('edit-id').value);
+        const index = MEM_RECORDS.findIndex(r => r.id === id);
+        if (index > -1) {
+            MEM_RECORDS[index].date = nowDate;
+            MEM_RECORDS[index].time = nowTime;
+            saveData();
+            showToast('시작 시간이 현재로 업데이트됨.');
+            resetForm();
+            document.getElementById('today-date-picker').value = getStatisticalDate(nowDate, nowTime);
+            updateAllDisplays();
+        }
+    });
+
+    // 현재 시간으로 운행 종료 (수정 모드)
+    document.getElementById('btn-edit-end-trip')?.addEventListener('click', () => {
+        const nowTime = getCurrentTimeString();
+        const nowDate = getTodayString();
+        const id = parseInt(document.getElementById('edit-id').value);
+        const index = MEM_RECORDS.findIndex(r => r.id === id);
+        if (index > -1 && MEM_RECORDS[index].type === '운행종료') {
+            MEM_RECORDS[index].date = nowDate;
+            MEM_RECORDS[index].time = nowTime;
+            showToast('종료 시간이 현재로 업데이트됨.');
+        } else {
+            addRecord({ id: Date.now(), date: nowDate, time: nowTime, type: '운행종료', distance: 0, cost: 0, income: 0 });
+            showToast('운행 종료되었습니다.');
+        }
+        saveData();
+        resetForm();
+        document.getElementById('today-date-picker').value = getStatisticalDate(nowDate, nowTime);
+        updateAllDisplays();
+    });
+
+    // 삭제
+    document.getElementById('btn-delete-record')?.addEventListener('click', () => {
+        if(confirm('삭제하시겠습니까?')) {
+            const id = parseInt(document.getElementById('edit-id').value);
+            const target = MEM_RECORDS.find(r => r.id === id);
+            let stayDate = document.getElementById('today-date-picker').value;
+            if(target) stayDate = getStatisticalDate(target.date, target.time);
+            removeRecord(id);
+            resetForm();
+            document.getElementById('today-date-picker').value = stayDate;
+            updateAllDisplays();
+        }
+    });
+
+    document.getElementById('btn-cancel-edit')?.addEventListener('click', resetForm);
+    document.getElementById('refresh-btn')?.addEventListener('click', () => { resetForm(); location.reload(); });
+    
+    document.getElementById('today-date-picker')?.addEventListener('change', () => updateAllDisplays());
+    
+    document.getElementById('prev-day-btn')?.addEventListener('click', () => {
+        const picker = document.getElementById('today-date-picker');
+        const parts = picker.value.split('-').map(Number);
+        const dateObj = new Date(parts[0], parts[1] - 1, parts[2] - 1);
+        picker.value = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
+        updateAllDisplays();
+    });
+    
+    document.getElementById('next-day-btn')?.addEventListener('click', () => {
+        const picker = document.getElementById('today-date-picker');
+        const parts = picker.value.split('-').map(Number);
+        const dateObj = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+        picker.value = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
+        updateAllDisplays();
+    });
+
+    // 입력 필드 자동완성
+    ['from-center', 'to-center'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', () => {
+            const from = document.getElementById('from-center').value.trim();
+            const to = document.getElementById('to-center').value.trim();
+            if((document.getElementById('type').value === '화물운송' || document.getElementById('type').value === '대기') && from && to) {
+                const key = `${from}-${to}`;
+                if(MEM_FARES[key]) document.getElementById('income').value = (MEM_FARES[key]/10000).toFixed(2);
+                if(MEM_DISTANCES[key]) document.getElementById('manual-distance').value = MEM_DISTANCES[key];
+                if(MEM_COSTS[key]) document.getElementById('cost').value = (MEM_COSTS[key]/10000).toFixed(2);
+            }
+            updateAddressDisplay();
+        });
+    });
+
+    document.getElementById('fuel-unit-price')?.addEventListener('input', () => { 
+        const p=parseFloat(document.getElementById('fuel-unit-price').value)||0; 
+        const l=parseFloat(document.getElementById('fuel-liters').value)||0; 
+        if(p&&l) document.getElementById('cost').value=(p*l/10000).toFixed(2); 
+    });
+    document.getElementById('fuel-liters')?.addEventListener('input', () => { 
+        const p=parseFloat(document.getElementById('fuel-unit-price').value)||0; 
+        const l=parseFloat(document.getElementById('fuel-liters').value)||0; 
+        if(p&&l) document.getElementById('cost').value=(p*l/10000).toFixed(2); 
+    });
+    
+    document.getElementById('type')?.addEventListener('change', toggleUI);
+    
+    // 탭 전환
+    document.querySelectorAll('.tab-btn').forEach(btn => { 
+        btn.addEventListener("click", event => { 
+            if(btn.parentElement.classList.contains('view-tabs')) { 
+                event.preventDefault(); 
+                document.querySelectorAll('.tab-btn').forEach(b => { if(b.parentElement.classList.contains('view-tabs')) b.classList.remove("active"); }); 
+                btn.classList.add("active"); 
+                document.querySelectorAll('.view-content').forEach(c => c.classList.remove('active')); 
+                document.getElementById(btn.dataset.view + "-view").classList.add("active"); 
+                updateAllDisplays(); 
+            } 
+        });
+    });
+
+    // 설정 페이지 토글
+    const mainPage = document.getElementById('main-page');
+    const settingsPage = document.getElementById('settings-page');
+    const goToSettingsBtn = document.getElementById('go-to-settings-btn');
+    const backToMainBtn = document.getElementById('back-to-main-btn');
+
+    goToSettingsBtn?.addEventListener("click", () => { 
+        mainPage.classList.add("hidden"); 
+        settingsPage.classList.remove("hidden"); 
+        goToSettingsBtn.classList.add("hidden"); 
+        backToMainBtn.classList.remove("hidden"); 
+        displayCumulativeData(); 
+        displayCurrentMonthData(); 
+    });
+    backToMainBtn?.addEventListener("click", () => { 
+        mainPage.classList.remove("hidden"); 
+        settingsPage.classList.add("hidden"); 
+        goToSettingsBtn.classList.remove("hidden"); 
+        backToMainBtn.classList.add("hidden"); 
+        updateAllDisplays(); 
+    });
+
+    // 아코디언 메뉴
+    document.querySelectorAll('.collapsible-header').forEach(header => { 
+        header.addEventListener("click", () => { 
+            const body = header.nextElementSibling; 
+            header.classList.toggle("active"); 
+            body.classList.toggle("hidden"); 
+            if (header.id === 'toggle-subsidy-management' && !body.classList.contains('hidden')) displaySubsidyRecords(false); 
+            if (header.id === 'toggle-center-management' && !body.classList.contains('hidden')) displayCenterList();
+        }); 
+    });
+    
+    // 설정 저장 등 기타 이벤트들
+    document.getElementById('subsidy-save-btn')?.addEventListener('click', () => { localStorage.setItem('fuel_subsidy_limit', document.getElementById('subsidy-limit').value); showToast('저장됨'); });
+    document.getElementById('mileage-correction-save-btn')?.addEventListener('click', () => { localStorage.setItem('mileage_correction', document.getElementById('mileage-correction').value); showToast('저장됨'); displayCumulativeData(); });
+    
+    // 데이터 백업/복원
+    document.getElementById('export-json-btn')?.addEventListener('click', () => { 
+        const data = { records: MEM_RECORDS, centers: MEM_CENTERS, locations: MEM_LOCATIONS, fares: MEM_FARES, distances: MEM_DISTANCES, costs: MEM_COSTS, subsidy: localStorage.getItem('fuel_subsidy_limit'), correction: localStorage.getItem('mileage_correction'), expenseItems: MEM_EXPENSE_ITEMS }; 
+        const b = new Blob([JSON.stringify(data,null,2)],{type:"application/json"}); 
+        const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download=`backup_${getTodayString()}.json`; 
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); 
+    });
+    document.getElementById('import-json-btn')?.addEventListener('click', () => document.getElementById('import-file-input').click());
+    document.getElementById('import-file-input')?.addEventListener('change', (e) => { 
+        if(!confirm('덮어쓰시겠습니까?')) return; 
+        const r = new FileReader(); 
+        r.onload = (evt) => { 
+            const d = JSON.parse(evt.target.result); 
+            if(d.records) localStorage.setItem('records', JSON.stringify(d.records)); 
+            if(d.centers) localStorage.setItem('logistics_centers', JSON.stringify(d.centers)); 
+            if(d.locations) localStorage.setItem('saved_locations', JSON.stringify(d.locations)); 
+            if(d.fares) localStorage.setItem('saved_fares', JSON.stringify(d.fares)); 
+            if(d.distances) localStorage.setItem('saved_distances', JSON.stringify(d.distances)); 
+            if(d.costs) localStorage.setItem('saved_costs', JSON.stringify(d.costs)); 
+            if(d.subsidy) localStorage.setItem('fuel_subsidy_limit', d.subsidy); 
+            if(d.correction) localStorage.setItem('mileage_correction', d.correction); 
+            if(d.expenseItems) localStorage.setItem('saved_expense_items', JSON.stringify(d.expenseItems));
+            alert('복원완료'); location.reload(); 
+        }; 
+        r.readAsText(e.target.files[0]); 
+    });
+    document.getElementById('clear-btn')?.addEventListener('click', () => { if(confirm('전체삭제?')) { localStorage.clear(); location.reload(); }});
+}
+
+document.addEventListener("DOMContentLoaded", initialSetup);
+</script>
 </body>
 </html>
