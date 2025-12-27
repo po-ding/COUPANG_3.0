@@ -1,5 +1,3 @@
---- START OF FILE main.js ---
-
 import * as Utils from './utils.js';
 import * as Data from './data.js';
 import * as UI from './ui.js';

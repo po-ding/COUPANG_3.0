@@ -1,5 +1,3 @@
---- START OF FILE ui.js ---
-
 import { getTodayString, getCurrentTimeString } from './utils.js';
 import { MEM_LOCATIONS, MEM_CENTERS, updateLocationData, saveData, MEM_RECORDS, MEM_EXPENSE_ITEMS } from './data.js';
 
@@ -29,6 +27,8 @@ export const els = {
     supplyMileageInput: document.getElementById('supply-mileage'),
     costInput: document.getElementById('cost'),
     incomeInput: document.getElementById('income'),
+    
+    // 섹션 영역들
     tripActions: document.getElementById('trip-actions'),
     generalActions: document.getElementById('general-actions'),
     editActions: document.getElementById('edit-actions'),
@@ -36,12 +36,12 @@ export const els = {
     // 메인 화면 버튼들
     btnTripCancel: document.getElementById('btn-trip-cancel'),
     btnStartTrip: document.getElementById('btn-start-trip'),
-    btnRegisterTrip: document.getElementById('btn-register-trip'), // [추가]
+    btnRegisterTrip: document.getElementById('btn-register-trip'), // [추가됨]
     btnEndTrip: document.getElementById('btn-end-trip'),
     btnSaveGeneral: document.getElementById('btn-save-general'),
     
-    // 수정 모드 버튼들
-    btnEditStartTrip: document.getElementById('btn-edit-start-trip'), // [추가]
+    // 수정 화면 버튼들
+    btnEditStartTrip: document.getElementById('btn-edit-start-trip'), // [추가됨]
     btnEditEndTrip: document.getElementById('btn-edit-end-trip'),
     btnUpdateRecord: document.getElementById('btn-update-record'),
     btnDeleteRecord: document.getElementById('btn-delete-record'),
@@ -96,11 +96,13 @@ export function toggleUI() {
     if (isEditMode) {
         els.editActions.classList.remove('hidden');
         if (type === '주유소' || type === '소모품' || type === '지출' || type === '수입') {
-            els.btnEditEndTrip.classList.add('hidden');
-            els.btnEditStartTrip.classList.add('hidden'); // [추가]
+            // 비운송 관련 수정시 시작/종료 버튼 숨김
+            if(els.btnEditEndTrip) els.btnEditEndTrip.classList.add('hidden');
+            if(els.btnEditStartTrip) els.btnEditStartTrip.classList.add('hidden');
         } else {
-            els.btnEditEndTrip.classList.remove('hidden');
-            els.btnEditStartTrip.classList.remove('hidden'); // [추가]
+            // 운송 관련 수정시 시작/종료 버튼 표시
+            if(els.btnEditEndTrip) els.btnEditEndTrip.classList.remove('hidden');
+            if(els.btnEditStartTrip) els.btnEditStartTrip.classList.remove('hidden');
         }
     }
 }
