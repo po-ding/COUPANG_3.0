@@ -1,4 +1,4 @@
-/** 버전: 16.5 | 최종 수정일: 2025-12-27 (최근 2주 빈도수 버튼 추가) */
+/** cargo note style.css */
 
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; margin: 0; padding: 0.5em; background-color: #f5f5f5; }
 .container { max-width: 600px; margin: auto; background-color: white; padding: 0.8em; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -38,79 +38,37 @@ button:hover { opacity: 0.8; }
 .action-btn-group button { flex: 1; }
 #edit-actions button { flex: 1 1 0; }
 
-.action-cell { display: flex; gap: 4px; justify-content: flex-end; align-items: center; }
-.action-cell .edit-btn, .action-cell .delete-btn { padding: 0.35em 0.7em; font-size: 0.85em; margin: 0 4px; }
+/* [테이블 행 색상] */
+/* 진행중: 연한 초록 */
+.row-in-progress td { background-color: #e8f5e9 !important; }
+/* 완료됨: 연한 회색 */
+.row-completed td { background-color: #f2f2f2 !important; }
+/* 운행종료: 연한 붉은색 */
+.row-end td { background-color: #ffebee !important; }
 
 .location-clickable { cursor: pointer; color: #0056b3; text-decoration: underline; text-decoration-style: dotted; padding: 2px 4px; }
-.location-clickable:hover { color: #007bff; background-color: rgba(0,123,255,0.1); border-radius: 2px; }
 .address-clickable { cursor: pointer; color: #0056b3; font-weight: 500; }
-.address-clickable:hover { text-decoration: underline; }
 .memo-display { color: #6c757d; font-size: 0.9em; padding-bottom: 0.5em; }
-.memo-display::before { content: '📝 '; }
-.cancelled { color: #6c757d; font-weight: bold; }
+.table-memo { display: block; font-size: 0.85em; color: #666; margin-top: 4px; padding: 2px 6px; background-color: rgba(255,255,255,0.7); border-radius: 4px; line-height: 1.4; word-break: break-all; }
 
-.table-memo {
-    display: block;          
-    font-size: 0.85em;       
-    color: #666;             
-    margin-top: 4px;         
-    padding: 2px 6px;        
-    background-color: #f1f3f5; 
-    border-radius: 4px;      
-    line-height: 1.4;
-    text-align: left;
-    word-break: break-all;
-}
-.table-memo::before {
-    content: '└ ';           
-    color: #adb5bd;
-    margin-right: 2px;
-}
-
-#toast-notification {
-    visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center;
-    border-radius: 4px; padding: 16px; position: fixed; z-index: 9999; left: 50%;
-    transform: translateX(-50%); bottom: 30px; font-size: 1em; opacity: 0;
-    transition: opacity 0.5s, visibility 0.5s;
-}
+#toast-notification { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 4px; padding: 16px; position: fixed; z-index: 9999; left: 50%; transform: translateX(-50%); bottom: 30px; font-size: 1em; opacity: 0; transition: opacity 0.5s, visibility 0.5s; }
 #toast-notification.show { visibility: visible; opacity: 1; }
 
-.collapsible-header {
-    cursor: pointer; user-select: none; background-color: #f8f9fa; border: 1px solid #ddd;
-    border-radius: 6px; padding: 0.8em 1em; margin-bottom: 0; transition: background-color: 0.2s;
-    font-size: 1.1em;
-}
+.collapsible-header { cursor: pointer; user-select: none; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; padding: 0.8em 1em; margin-bottom: 0; transition: background-color: 0.2s; font-size: 1.1em; }
 .collapsible-header:hover { background-color: #e9ecef; }
 .collapsible-header::after { content: '+'; float: right; font-weight: bold; font-size: 1.2em; line-height: 1; transition: transform 0.3s; }
-.collapsible-header.active { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .collapsible-header.active::after { content: '−'; }
 .collapsible-body { padding: 1em; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; margin-top: -1px; margin-bottom: 2em; }
 .collapsible-body.hidden { display: none; }
-h2.collapsible-header { border-bottom: 1px solid #ddd; text-align: left; }
 
-#center-list-container { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 0.5em; 
-    max-height: 350px; 
-    overflow-y: auto;
-    border: 1px solid #eee;
-    padding: 5px;
-    border-radius: 4px;
-}
+#center-list-container { display: flex; flex-direction: column; gap: 0.5em; max-height: 350px; overflow-y: auto; border: 1px solid #eee; padding: 5px; border-radius: 4px; }
 .center-item { display: flex; flex-direction: column; background-color: #f8f9fa; padding: 0.8em; border: 1px solid #eee; border-radius: 4px; gap: 0.5em; }
 .center-item .info { display: flex; justify-content: space-between; align-items: center; }
 .center-item .center-name { flex-grow: 1; font-weight: 500; }
-.center-item .action-buttons { display: flex; gap: 0.5em; margin: 0; }
-.center-item button { margin: 0; width: auto; flex-shrink: 0; padding: 0.4em 0.8em; }
-#add-center-btn { margin-top: 0; }
-.center-item .edit-form { display: flex; flex-direction: column; gap: 0.5em; margin-top: 0.5em; }
-.center-item .edit-input { width: 100%; }
 
 .view-section { margin-top: 2em; }
 .view-tabs { display: flex; border-bottom: 2px solid #ddd; }
-.tab-btn { background-color: #f1f1f1; color: #555; border: 1px solid #ccc; border-bottom: none; cursor: pointer; padding: 12px 15px; margin-bottom: -2px; border-radius: 6px 6px 0 0; flex: 1; font-size: 1em; font-weight: 500; transition: all 0.2s ease-in-out; }
-.tab-btn:hover:not(.active) { background-color: #e9ecef; }
+.tab-btn { background-color: #f1f1f1; color: #555; border: 1px solid #ccc; border-bottom: none; cursor: pointer; padding: 12px 15px; margin-bottom: -2px; border-radius: 6px 6px 0 0; flex: 1; font-size: 1em; font-weight: 500; transition: all 0.2s; }
 .tab-btn.active { color: white; border-bottom: 2px solid white; }
 .tab-btn[data-view="today"].active { background-color: #28a745; border-color: #28a745; }
 .tab-btn[data-view="daily"].active { background-color: #007bff; border-color: #007bff; }
@@ -121,28 +79,11 @@ h2.collapsible-header { border-bottom: 1px solid #ddd; text-align: left; }
 
 .selector-group { display: flex; gap: 1em; justify-content: center; margin-bottom: 1em; align-items: center; }
 .selector-group button { flex-grow: 0; width: auto; padding: 0.5em 1em; margin: 0; background-color: #6c757d; }
-#mileage-summary-controls .tab-btn { flex-grow: 1; background-color: #f1f1f1; color: #555; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 0; }
-#mileage-summary-controls .tab-btn.active { background-color: #007bff; color: white; border-color: #007bff; }
 
 .summary { background-color: #e9f5ff; border-radius: 4px; padding: 1em; margin-bottom: 1em; }
 .summary strong { display: block; margin-bottom: 0.8em; text-align: center; }
-.summary-toggle-grid { 
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px; 
-    cursor: pointer;
-    user-select: none;
-}
-.summary-item {
-    background-color: #fff;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 6px 12px;
-    transition: background-color 0.2s, border-color 0.2s;
-    text-align: center;
-    font-size: 0.9em;
-}
-.summary-toggle-grid:hover .summary-item { background-color: #fdfdfd; }
+.summary-toggle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; cursor: pointer; user-select: none; }
+.summary-item { background-color: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 6px 12px; text-align: center; font-size: 0.9em; }
 .summary-toggle-grid.active .summary-item { background-color: #007bff; color: white; border-color: #007bff; }
 .summary-toggle-grid.active .summary-item .summary-value { color: white !important; }
 .summary-label { font-weight: 500; display: block; }
@@ -150,7 +91,6 @@ h2.collapsible-header { border-bottom: 1px solid #ddd; text-align: left; }
 
 .subsidy-summary { background-color: #f8f9fa; border: 1px solid #eee; text-align: center; border-radius: 4px; padding: 1em; margin-bottom: 1em; line-height: 1.8; }
 .data-summary-section { margin-top: 2.5em; }
-#current-month-summary-container, #cumulative-summary-container { margin-bottom: 2em; }
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.8em; }
 .metric-card { background-color: #f8f9fa; border: 1px solid #eee; border-radius: 8px; padding: 1em; text-align: center; }
 .metric-card.highlight { background-color: #e7f5ff; border-color: #007bff; }
@@ -164,112 +104,69 @@ th { background-color: #f2f2f2; }
 .responsive-table th, .responsive-table td { border: 1px solid #ddd; }
 .yearly-summary-table th, .yearly-summary-table td { border: 1px solid #ddd; text-align: center;}
 
-#today-records-table tbody tr { cursor: pointer; }
-#today-records-table tbody tr:hover { background-color: #f8f9fa; }
-
-.responsive-table.auto-layout th, 
-.responsive-table.auto-layout td {
-    white-space: normal;
-    word-break: break-all;
-    width: auto;
-    padding: 0.4em;
-    font-size: 0.85em;
-}
-.responsive-table.auto-layout th:last-child,
-.responsive-table.auto-layout td:last-child {
-    min-width: 40px; 
-}
+.responsive-table.auto-layout th, .responsive-table.auto-layout td { white-space: normal; word-break: break-all; width: auto; padding: 0.4em; font-size: 0.85em; }
+.responsive-table.auto-layout th:last-child, .responsive-table.auto-layout td:last-child { min-width: 40px; }
 
 .progress-bar-container { background-color: #e9ecef; border-radius: .25rem; height: 1.5rem; overflow: hidden; display: flex; }
 .progress-bar { height: 100%; text-align: center; color: white; font-size: 0.8em; line-height: 1.5rem; white-space: nowrap; transition: width 0.6s ease; }
 .progress-bar-used { background-color: #17a2b8; }
-
 .note { color: #555; font-size: 0.9em; }
 .income { color: green; }
 .cost { color: red; }
 .net { color: #0056b3; }
-.hidden { display: none; }
-.action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin-top: 1em; }
-.action-buttons button { width: 100%; margin: 0; }
-#export-json-btn { background-color: #5a6268; }
-#import-json-btn { background-color: #e0a800; }
-#clear-btn { background-color: #c82333; }
+.hidden { display: none !important; }
 
-#subsidy-records-container { margin-top: 1.5em; }
-#subsidy-load-more-container { text-align: center; margin-top: 1em; }
-.load-more-btn { background-color: #6c757d; width: 100%; }
+.file-upload-btn { display: inline-block; padding: 0.8em 1em; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; text-align: center; font-weight: bold; width: 100%; box-sizing: border-box; }
+.location-container { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.quick-btn-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; width: 100%; }
+.quick-loc-btn { padding: 6px 1px; font-size: 0.7em; background-color: #f1f3f5; color: #495057; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; text-align: center; }
 
-.file-upload-btn {
-    display: inline-block;
-    padding: 0.8em 1em;
-    background-color: #007bff;
-    color: white;
-    border-radius: 4px;
-    cursor: pointer;
-    text-align: center;
-    font-weight: bold;
-    width: 100%;
-    box-sizing: border-box;
-}
-.file-upload-btn:hover {
-    background-color: #0056b3;
-}
-.file-upload-btn:active {
-    background-color: #004085;
-}
-
-/* [추가] 2주 기준 빈도수 버튼 스타일 */
-.location-container {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 100%;
-}
-.quick-btn-row {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr); /* 5개 균등 정렬 */
-    gap: 4px;
-    width: 100%;
-}
-.quick-loc-btn {
-    padding: 6px 1px;
-    font-size: 0.7em;
-    background-color: #f1f3f5;
-    color: #495057;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 500;
-    text-align: center;
-}
-.quick-loc-btn:hover { background-color: #e9ecef; border-color: #adb5bd; }
-.quick-loc-btn:active { background-color: #007bff; color: white; }
-
+/* [모바일 스타일] */
 @media screen and (max-width: 768px) {
-    /* [모바일 버튼 최적화] */
-    .action-btn-group button {
-        padding: 0.8em 0.3em; /* 좌우 패딩 축소 */
-        font-size: 0.9em;
-        line-height: 1.2; /* 줄간격 조정 */
+    .action-btn-group button { padding: 0.8em 0.3em; font-size: 0.9em; line-height: 1.2; }
+    
+    /* 모바일 아코디언 스타일 */
+    .mobile-toggle-legend { 
+        cursor: pointer; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        width: 100%;
+        padding-right: 10px;
+    }
+    .mobile-toggle-body {
+        /* 기본적으로 숨김 (높이 0)에서 펼쳐짐 */
+        display: none; 
+        margin-top: 10px;
+    }
+    .mobile-toggle-body.active {
+        display: block;
+    }
+    .toggle-icon {
+        font-size: 0.8em;
+        color: #999;
+        transition: transform 0.3s;
+    }
+    .mobile-toggle-legend.active .toggle-icon {
+        transform: rotate(180deg);
     }
 
-    .responsive-table thead, .yearly-summary-table thead { display: none; }
-    .responsive-table, .responsive-table tbody, .responsive-table tr, .responsive-table td,
-    .yearly-summary-table, .yearly-summary-table tbody, .yearly-summary-table tr, .yearly-summary-table td { 
-        display: block; width: 100%; 
-    }
-    .responsive-table tr, .yearly-summary-table tr { 
-        margin-bottom: 1em; border: 1px solid #ddd; border-radius: 4px; 
-    }
-    .responsive-table td, .yearly-summary-table td { 
-        text-align: right; padding-left: 50%; position: relative; border: none; border-bottom: 1px solid #eee; box-sizing: border-box; 
-        white-space: normal;
-    }
-    .responsive-table td:before, .yearly-summary-table td:before { 
-        content: attr(data-label); position: absolute; left: 0; width: 45%; padding-left: 1em; font-weight: bold; text-align: left; 
-    }
-    .responsive-table tr td:last-child, .yearly-summary-table tr td:last-child { border-bottom: none; }
+    .responsive-table thead { display: none; }
+    .responsive-table tbody, .responsive-table tr, .responsive-table td { display: block; width: 100%; }
+    .responsive-table tr { margin-bottom: 1em; border: 1px solid #ddd; border-radius: 4px; }
+    .responsive-table td { text-align: right; padding-left: 50%; position: relative; border: none; border-bottom: 1px solid #eee; }
+    .responsive-table td:before { content: attr(data-label); position: absolute; left: 0; width: 45%; padding-left: 1em; font-weight: bold; text-align: left; }
+    .responsive-table tr td:last-child { border-bottom: none; }
+    
+    /* PC에서는 기본 표시 */
+    .yearly-summary-table thead { display: none; }
+    .yearly-summary-table tr { display: block; margin-bottom: 1em; border: 1px solid #ddd; }
+    .yearly-summary-table td { display: block; text-align: right; padding-left: 50%; position: relative; border-bottom: 1px solid #eee; }
+    .yearly-summary-table td:before { content: attr(data-label); position: absolute; left: 0; width: 45%; padding-left: 10px; font-weight: bold; text-align: left; }
+}
+
+@media screen and (min-width: 769px) {
+    .toggle-icon { display: none; }
+    /* PC에서는 항상 보이게 */
+    .mobile-toggle-body { display: block !important; }
 }

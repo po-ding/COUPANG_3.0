@@ -3,21 +3,30 @@ import * as Data from './data.js';
 import * as UI from './ui.js';
 import * as Stats from './stats.js';
 
-// ==========================================
-// 1. 이벤트 리스너 등록 (안전하게 직접 연결)
-// ==========================================
 function setupEventListeners() {
-    console.log("이벤트 리스너 등록 시작..."); // 디버깅용
-
-    // [공통] 요소 가져오기 헬퍼
     const getEl = (id) => document.getElementById(id);
 
-    // 1-1. 상/하차지 입력 시 자동완성 및 값 초기화
+    // [모바일 아코디언 토글 로직 추가]
+    const toggleSections = ['datetime', 'type'];
+    toggleSections.forEach(section => {
+        const legend = getEl(`legend-${section}`);
+        const body = getEl(`body-${section}`);
+        if(legend && body) {
+            legend.addEventListener('click', () => {
+                // 모바일 환경일 때만 토글
+                if(window.innerWidth <= 768) {
+                    legend.classList.toggle('active');
+                    body.classList.toggle('active');
+                }
+            });
+        }
+    });
+
+    // 상/하차지 입력 시 자동완성 및 값 초기화 로직
     const handleLocationInput = () => {
         const fromIn = getEl('from-center');
         const toIn = getEl('to-center');
         const typeIn = getEl('type');
-        
         if(!fromIn || !toIn) return;
 
         const from = fromIn.value.trim();
@@ -26,26 +35,20 @@ function setupEventListeners() {
 
         if((type === '화물운송' || type === '대기') && from && to) {
             const key = `${from}-${to}`;
-            
-            // 수입(운임)
             const incomeEl = getEl('income');
             if(incomeEl) {
                 if(Data.MEM_FARES[key]) incomeEl.value = (Data.MEM_FARES[key]/10000).toFixed(2);
                 else incomeEl.value = ''; 
             }
-
-            // 운행거리
             const distEl = getEl('manual-distance');
             if(distEl) {
                 if(Data.MEM_DISTANCES[key]) distEl.value = Data.MEM_DISTANCES[key];
-                else distEl.value = '';
+                else distEl.value = ''; 
             }
-
-            // 지출(운송비)
             const costEl = getEl('cost');
             if(costEl) {
                 if(Data.MEM_COSTS[key]) costEl.value = (Data.MEM_COSTS[key]/10000).toFixed(2);
-                else costEl.value = '';
+                else costEl.value = ''; 
             }
         }
         UI.updateAddressDisplay();
@@ -54,11 +57,10 @@ function setupEventListeners() {
     getEl('from-center')?.addEventListener('input', handleLocationInput);
     getEl('to-center')?.addEventListener('input', handleLocationInput);
 
-    // 1-2. 메인 버튼 이벤트
+    // 버튼 이벤트들
     getEl('btn-register-trip')?.addEventListener('click', () => {
         const formData = UI.getFormDataWithoutTime();
         if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
-        // 입력된 시간 사용
         Data.addRecord({ 
             id: Date.now(), 
             date: getEl('date').value, 
@@ -73,11 +75,9 @@ function setupEventListeners() {
     getEl('btn-start-trip')?.addEventListener('click', () => {
         const formData = UI.getFormDataWithoutTime();
         if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
-        // GPS 시간 사용
         Data.addRecord({ id: Date.now(), date: Utils.getTodayString(), time: Utils.getCurrentTimeString(), ...formData });
         Utils.showToast('운행 시작됨');
         UI.resetForm();
-        // 날짜가 바뀌었을 수 있으므로 피커 갱신
         const statDate = Utils.getStatisticalDate(Utils.getTodayString(), Utils.getCurrentTimeString());
         if(getEl('today-date-picker')) getEl('today-date-picker').value = statDate;
         updateAllDisplays();
@@ -111,7 +111,6 @@ function setupEventListeners() {
         if(formData.type === '주유소') Stats.displaySubsidyRecords();
     });
 
-    // 1-3. 수정 모드 버튼 이벤트
     getEl('btn-update-record')?.addEventListener('click', () => {
         const id = parseInt(getEl('edit-id').value);
         const index = Data.MEM_RECORDS.findIndex(r => r.id === id);
@@ -119,7 +118,6 @@ function setupEventListeners() {
             const original = Data.MEM_RECORDS[index];
             const formData = UI.getFormDataWithoutTime();
             
-            // 자동완성 데이터 학습
             if (formData.type === '화물운송' && formData.from && formData.to) {
                 const key = `${formData.from}-${formData.to}`;
                 if(formData.distance > 0) Data.MEM_DISTANCES[key] = formData.distance;
@@ -129,17 +127,12 @@ function setupEventListeners() {
                 if (formData.expenseItem) Data.updateExpenseItemData(formData.expenseItem); 
             }
 
-            // 기존 날짜/시간 유지하면서 업데이트
             Data.MEM_RECORDS[index] = { ...original, ...formData, date: original.date, time: original.time };
             Data.saveData();
-            
             Utils.showToast('수정 완료');
             UI.resetForm();
-            
-            // 해당 날짜로 이동해서 보여줌
             const statDate = Utils.getStatisticalDate(original.date, original.time);
             if(getEl('today-date-picker')) getEl('today-date-picker').value = statDate;
-            
             updateAllDisplays();
         }
     });
@@ -150,10 +143,8 @@ function setupEventListeners() {
             const target = Data.MEM_RECORDS.find(r => r.id === id);
             let stayDate = getEl('today-date-picker').value;
             if(target) stayDate = Utils.getStatisticalDate(target.date, target.time);
-            
             Data.removeRecord(id);
             UI.resetForm();
-            
             if(getEl('today-date-picker')) getEl('today-date-picker').value = stayDate;
             updateAllDisplays();
         }
@@ -161,70 +152,53 @@ function setupEventListeners() {
 
     getEl('btn-cancel-edit')?.addEventListener('click', UI.resetForm);
 
-    // [수정 모드] 현재 시간으로 운행 시작
     getEl('btn-edit-start-trip')?.addEventListener('click', () => {
         const nowTime = Utils.getCurrentTimeString();
         const nowDate = Utils.getTodayString();
         const id = parseInt(getEl('edit-id').value);
         const index = Data.MEM_RECORDS.findIndex(r => r.id === id);
-
         if (index > -1) {
             Data.MEM_RECORDS[index].date = nowDate;
             Data.MEM_RECORDS[index].time = nowTime;
             Data.saveData();
             Utils.showToast('시작 시간이 현재로 변경됨');
             UI.resetForm();
-            
             const statDate = Utils.getStatisticalDate(nowDate, nowTime);
             if(getEl('today-date-picker')) getEl('today-date-picker').value = statDate;
             updateAllDisplays();
         }
     });
 
-    // [수정 모드] 현재 시간으로 운행 종료
     getEl('btn-edit-end-trip')?.addEventListener('click', () => {
         const nowTime = Utils.getCurrentTimeString();
         const nowDate = Utils.getTodayString();
         const id = parseInt(getEl('edit-id').value);
         const index = Data.MEM_RECORDS.findIndex(r => r.id === id);
-
         if (index > -1 && Data.MEM_RECORDS[index].type === '운행종료') {
-            // 이미 운행종료인 기록을 수정 중이면 시간만 업데이트
             Data.MEM_RECORDS[index].date = nowDate;
             Data.MEM_RECORDS[index].time = nowTime;
             Utils.showToast('종료 시간이 현재로 변경됨');
         } else {
-            // 다른 기록 수정 중에 눌렀다면 새로 종료 기록 추가
             Data.addRecord({ id: Date.now(), date: nowDate, time: nowTime, type: '운행종료', distance: 0, cost: 0, income: 0 });
             Utils.showToast('운행 종료됨');
         }
         Data.saveData();
         UI.resetForm();
-        
         const statDate = Utils.getStatisticalDate(nowDate, nowTime);
         if(getEl('today-date-picker')) getEl('today-date-picker').value = statDate;
         updateAllDisplays();
     });
 
-    // 1-4. 기타 UI 이벤트
     getEl('refresh-btn')?.addEventListener('click', () => { UI.resetForm(); location.reload(); });
     getEl('today-date-picker')?.addEventListener('change', () => updateAllDisplays());
-    
-    getEl('prev-day-btn')?.addEventListener('click', () => {
-        moveDate(-1);
-    });
-    getEl('next-day-btn')?.addEventListener('click', () => {
-        moveDate(1);
-    });
+    getEl('prev-day-btn')?.addEventListener('click', () => moveDate(-1));
+    getEl('next-day-btn')?.addEventListener('click', () => moveDate(1));
 
-    // 설정 페이지 이동 (버튼 안눌림 해결)
     getEl('go-to-settings-btn')?.addEventListener('click', () => { 
         getEl('main-page').classList.add("hidden"); 
         getEl('settings-page').classList.remove("hidden"); 
         getEl('go-to-settings-btn').classList.add("hidden"); 
         getEl('back-to-main-btn').classList.remove("hidden"); 
-        
-        // 설정 페이지 열 때 데이터 갱신
         Stats.displayCumulativeData(); 
         Stats.displayCurrentMonthData(); 
         Stats.displaySubsidyRecords();
@@ -238,7 +212,6 @@ function setupEventListeners() {
         updateAllDisplays(); 
     });
 
-    // 아코디언 메뉴
     document.querySelectorAll('.collapsible-header').forEach(header => { 
         header.addEventListener("click", () => { 
             const body = header.nextElementSibling; 
@@ -249,7 +222,6 @@ function setupEventListeners() {
         }); 
     });
 
-    // 뷰 탭 전환
     document.querySelectorAll('.tab-btn').forEach(btn => { 
         btn.addEventListener("click", event => { 
             if(btn.parentElement.classList.contains('view-tabs')) { 
@@ -264,7 +236,6 @@ function setupEventListeners() {
         });
     });
 
-    // 기타 헬퍼
     getEl('fuel-unit-price')?.addEventListener('input', () => { 
         const p=parseFloat(getEl('fuel-unit-price').value)||0; 
         const l=parseFloat(getEl('fuel-liters').value)||0; 
@@ -273,7 +244,6 @@ function setupEventListeners() {
     
     getEl('type')?.addEventListener('change', UI.toggleUI);
     
-    // 글로벌 함수 (HTML onclick="editRecord(..)" 대응)
     window.viewDateDetails = (date) => { 
         getEl('today-date-picker').value = date; 
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove("active")); 
@@ -296,27 +266,33 @@ function setupEventListeners() {
 
 // 2. 초기화 및 실행
 function initialSetup() {
-    Data.loadAllData(); // 데이터 먼저 로드
+    Data.loadAllData();
     UI.populateCenterDatalist();
     UI.populateExpenseDatalist();
     
-    // 날짜 초기화
+    const y = new Date().getFullYear();
+    const yrs = []; for(let i=0; i<5; i++) yrs.push(`<option value="${y-i}">${y-i}년</option>`);
+    ['daily-year-select', 'weekly-year-select', 'monthly-year-select', 'print-year-select'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.innerHTML = yrs.join('');
+    });
+    const ms = []; for(let i=1; i<=12; i++) ms.push(`<option value="${i.toString().padStart(2,'0')}">${i}월</option>`);
+    ['daily-month-select', 'weekly-month-select', 'print-month-select'].forEach(id => {
+        const el = document.getElementById(id); if(el) { el.innerHTML = ms.join(''); el.value = (new Date().getMonth()+1).toString().padStart(2,'0'); }
+    });
+
+    const mC = document.getElementById('mileage-correction'); if(mC) mC.value = localStorage.getItem('mileage_correction') || 0;
+    const sL = document.getElementById('subsidy-limit'); if(sL) sL.value = localStorage.getItem('fuel_subsidy_limit') || 0;
+    
     const todayStr = Utils.getTodayString();
     const nowTime = Utils.getCurrentTimeString();
     const statToday = Utils.getStatisticalDate(todayStr, nowTime);
+    
     const picker = document.getElementById('today-date-picker');
     if(picker) picker.value = statToday;
 
-    // UI 초기화
     UI.resetForm();
-    
-    // 이벤트 리스너 등록
-    setupEventListeners();
-    
-    // 데이터 표시
     updateAllDisplays();
-    
-    // OCR 등 나머지 초기화
+    setupEventListeners();
     initOtherFeatures();
 }
 
@@ -329,7 +305,7 @@ function updateAllDisplays() {
     Stats.displayDailyRecords();
     Stats.displayWeeklyRecords();
     Stats.displayMonthlyRecords();
-    renderFrequentLocationButtons();
+    renderFrequentLocationButtons(); 
 }
 
 function moveDate(offset) {
@@ -356,7 +332,9 @@ function renderFrequentLocationButtons() {
 
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-    const fromCounts = {}, toCounts = {};
+
+    const fromCounts = {};
+    const toCounts = {};
 
     Data.MEM_RECORDS.forEach(r => {
         const recordDate = new Date(r.date);
@@ -392,18 +370,6 @@ function renderFrequentLocationButtons() {
 }
 
 function initOtherFeatures() {
-    // 년월 선택기
-    const y = new Date().getFullYear();
-    const yrs = []; for(let i=0; i<5; i++) yrs.push(`<option value="${y-i}">${y-i}년</option>`);
-    ['daily-year-select', 'weekly-year-select', 'monthly-year-select', 'print-year-select'].forEach(id => {
-        const el = document.getElementById(id); if(el) el.innerHTML = yrs.join('');
-    });
-    const ms = []; for(let i=1; i<=12; i++) ms.push(`<option value="${i.toString().padStart(2,'0')}">${i}월</option>`);
-    ['daily-month-select', 'weekly-month-select', 'print-month-select'].forEach(id => {
-        const el = document.getElementById(id); if(el) { el.innerHTML = ms.join(''); el.value = (new Date().getMonth()+1).toString().padStart(2,'0'); }
-    });
-    
-    // 백업/복원
     document.getElementById('export-json-btn')?.addEventListener('click', () => { 
         const data = { records: Data.MEM_RECORDS, centers: Data.MEM_CENTERS, locations: Data.MEM_LOCATIONS, fares: Data.MEM_FARES, distances: Data.MEM_DISTANCES, costs: Data.MEM_COSTS, subsidy: localStorage.getItem('fuel_subsidy_limit'), correction: localStorage.getItem('mileage_correction'), expenseItems: Data.MEM_EXPENSE_ITEMS }; 
         const b = new Blob([JSON.stringify(data,null,2)],{type:"application/json"}); 
