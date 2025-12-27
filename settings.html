@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cargo note - 설정</title>
+    <link rel="stylesheet" href="style.css">
+    <script src='https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js'></script>
+</head>
+<body>
+    <div class="container">
+        <div class="page-nav">
+            <h1 class="logo">cargo<span class="logo-point">note</span></h1>
+            <div class="nav-buttons">
+                <button type="button" onclick="location.href='index.html'">← 기록부로</button>
+            </div>
+        </div>
+
+        <div id="settings-page">
+            <!-- 데이터 요약 섹션 -->
+            <div class="data-summary-section">
+                <h2>📊 데이터 요약</h2>
+                <div id="current-month-summary-container">
+                    <h4 id="current-month-title"></h4>
+                    <div class="summary-grid" id="month-summary-grid">
+                        <!-- JS에서 동적 생성 -->
+                    </div>
+                </div>
+                <div id="cumulative-summary-container">
+                    <h4>누적 데이터</h4>
+                    <div class="summary-grid" id="cumulative-summary-grid"></div>
+                </div>
+            </div>
+
+            <!-- 아코디언 메뉴들 -->
+            <h2 id="toggle-center-management" class="collapsible-header">📍 운송 지역 관리</h2>
+            <div id="center-management-body" class="collapsible-body hidden">
+                <!-- 지역 추가 및 목록 레이아웃 -->
+            </div>
+
+            <h2 id="toggle-subsidy-management" class="collapsible-header">⛽ 유가보조금/OCR</h2>
+            <div id="subsidy-management-body" class="collapsible-body hidden">
+                <fieldset>
+                    <legend>📷 영수증 인식</legend>
+                    <label for="ocr-input" class="file-upload-btn">📷 영수증 이미지 선택</label>
+                    <input type="file" id="ocr-input" accept="image/*" class="hidden">
+                    <div id="ocr-status" class="note"></div>
+                    <!-- OCR 결과 폼 레이아웃 -->
+                </fieldset>
+            </div>
+
+            <h2 id="toggle-print-management" class="collapsible-header">🖨️ 내역 출력</h2>
+            <div id="print-management-body" class="collapsible-body hidden">
+                <!-- 출력 기간 선택 레이아웃 -->
+            </div>
+
+            <h2 id="toggle-data-management" class="collapsible-header">💾 데이터 관리 (백업/복원)</h2>
+            <div id="data-management-body" class="collapsible-body hidden">
+                <div class="action-buttons">
+                    <button type="button" id="export-json-btn">JSON 저장 (백업)</button>
+                    <button type="button" id="import-json-btn">JSON 복원</button>
+                    <button type="button" id="clear-btn">전체 데이터 삭제</button>
+                </div>
+                <input type="file" id="import-file-input" class="hidden" accept=".json">
+            </div>
+        </div>
+    </div>
+    <div id="toast-notification"></div>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
