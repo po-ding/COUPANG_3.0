@@ -240,7 +240,7 @@ UI.els.btnTripCancel.addEventListener('click', () => {
     updateAllDisplays();
 });
 
-// 2. 운행 시작
+// 2. 운행 시작 (GPS 시간 사용)
 UI.els.btnStartTrip.addEventListener('click', () => {
     const formData = UI.getFormDataWithoutTime();
     
@@ -255,6 +255,31 @@ UI.els.btnStartTrip.addEventListener('click', () => {
     
     const nowStatDate = Utils.getStatisticalDate(Utils.getTodayString(), Utils.getCurrentTimeString());
     document.getElementById('today-date-picker').value = nowStatDate;
+    updateAllDisplays();
+});
+
+// [추가] 2-1. 운행 등록 (시간 입력 안함 -> 입력된 값 사용 또는 미입력시 유지)
+UI.els.btnRegisterTrip.addEventListener('click', () => {
+    const formData = UI.getFormDataWithoutTime();
+    
+    if (formData.type === '화물운송' && formData.distance <= 0) {
+        alert('운행거리를 입력해주세요.');
+        return;
+    }
+
+    // 운행 등록은 GPS 시간을 강제하지 않고, 현재 입력 양식에 있는 시간을 사용 (사용자가 별도 입력 안했다면 그 값 그대로)
+    Data.addRecord({ 
+        id: Date.now(), 
+        date: UI.els.dateInput.value, 
+        time: UI.els.timeInput.value, // 입력된 시간 사용
+        ...formData 
+    });
+    
+    Utils.showToast('등록되었습니다.');
+    UI.resetForm();
+    
+    const statDate = Utils.getStatisticalDate(UI.els.dateInput.value, UI.els.timeInput.value);
+    document.getElementById('today-date-picker').value = statDate;
     updateAllDisplays();
 });
 

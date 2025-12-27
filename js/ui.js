@@ -35,6 +35,7 @@ export const els = {
     
     btnTripCancel: document.getElementById('btn-trip-cancel'),
     btnStartTrip: document.getElementById('btn-start-trip'),
+    btnRegisterTrip: document.getElementById('btn-register-trip'), // [추가]
     btnEndTrip: document.getElementById('btn-end-trip'),
     btnSaveGeneral: document.getElementById('btn-save-general'),
     btnEditEndTrip: document.getElementById('btn-edit-end-trip'),
