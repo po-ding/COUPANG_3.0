@@ -31,14 +31,13 @@ export const els = {
     generalActions: document.getElementById('general-actions'),
     editActions: document.getElementById('edit-actions'),
     
-    // 버튼 정의
     btnTripCancel: document.getElementById('btn-trip-cancel'),
     btnStartTrip: document.getElementById('btn-start-trip'),
-    btnRegisterTrip: document.getElementById('btn-register-trip'), // [추가]
+    btnRegisterTrip: document.getElementById('btn-register-trip'),
     btnEndTrip: document.getElementById('btn-end-trip'),
     btnSaveGeneral: document.getElementById('btn-save-general'),
     
-    btnEditStartTrip: document.getElementById('btn-edit-start-trip'), // [추가]
+    btnEditStartTrip: document.getElementById('btn-edit-start-trip'),
     btnEditEndTrip: document.getElementById('btn-edit-end-trip'),
     btnUpdateRecord: document.getElementById('btn-update-record'),
     btnDeleteRecord: document.getElementById('btn-delete-record'),
@@ -243,7 +242,6 @@ function handleCenterEdit(div, c) {
     div.querySelector('.cancel-edit-btn').onclick = () => displayCenterList(document.getElementById('center-search-input').value);
 }
 
-// [OCR] 관련 함수는 UI 요소가 있을 때만 실행되도록 내부 방어 로직 이미 존재
 export async function processReceiptImage(file) {
     const statusDiv = document.getElementById('ocr-status');
     const resultContainer = document.getElementById('ocr-result-container');
@@ -324,4 +322,18 @@ function parseReceiptText(text) {
             if (!matches) return null;
             let lastVal = matches[matches.length - 1];
             if(lastVal.endsWith('.')) lastVal = lastVal.slice(0, -1);
-  
+            return parseFloat(lastVal.replace(/,/g, ''));
+        };
+        if (lineClean.includes('주유금액') || lineClean.includes('승인금액')) { const val = extractNum(line); if (val && val > 1000) document.getElementById('ocr-cost').value = val; }
+        if (lineClean.includes('주유리터') || lineClean.includes('주유량')) { const val = extractNum(line); if (val) document.getElementById('ocr-liters').value = val; }
+        if (lineClean.includes('주유단가')) { const val = extractNum(line); if (val && val > 500 && val < 3000) document.getElementById('ocr-price').value = val; }
+        if (lineClean.includes('보조금액') || lineClean.includes('보조금')) { const val = extractNum(line); if (val) document.getElementById('ocr-subsidy').value = val; }
+        if (lineClean.includes('잔여한도')) { const val = extractNum(line); if (val) document.getElementById('ocr-remaining').value = val; }
+    }
+    const lit = parseFloat(document.getElementById('ocr-liters').value) || 0;
+    const price = parseInt(document.getElementById('ocr-price').value) || 0;
+    let cost = parseInt(document.getElementById('ocr-cost').value) || 0;
+    if (cost === 0 && lit > 0 && price > 0) { cost = Math.round(lit * price); document.getElementById('ocr-cost').value = cost; }
+    const subsidy = parseInt(document.getElementById('ocr-subsidy').value) || 0;
+    if (cost > 0) { document.getElementById('ocr-net-cost').value = cost - subsidy; }
+}

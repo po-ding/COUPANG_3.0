@@ -1,11 +1,11 @@
---- START OF FILE stats.js ---
-
 import { formatToManwon, getStatisticalDate, getTodayString } from './utils.js';
 import { MEM_RECORDS, MEM_LOCATIONS } from './data.js';
 import { editRecord } from './ui.js';
 
+// 전역 변수 (페이징용)
 let displayedSubsidyCount = 0;
 
+// 안전한 숫자 변환 유틸리티
 function safeInt(value) {
     if (!value) return 0;
     const num = parseInt(String(value).replace(/,/g, ''), 10);
@@ -18,6 +18,7 @@ function safeFloat(value) {
     return isNaN(num) ? 0 : num;
 }
 
+// 총 소요 시간 계산
 export function calculateTotalDuration(records) {
     const sorted = [...records].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     let totalMinutes = 0;
@@ -34,7 +35,9 @@ export function calculateTotalDuration(records) {
     return `${hours}h ${minutes}m`;
 }
 
+// 상단 요약 HTML 생성 (토글 기능 포함)
 export function createSummaryHTML(title, records) {
+    // 운행취소와 운행종료는 통계 제외
     const validRecords = records.filter(r => r.type !== '운행취소' && r.type !== '운행종료');
     let totalIncome = 0, totalExpense = 0, totalDistance = 0, totalTripCount = 0;
     let totalFuelCost = 0, totalFuelLiters = 0;
@@ -66,13 +69,17 @@ export function createSummaryHTML(title, records) {
         { label: '주유리터', value: totalFuelLiters.toFixed(2), unit: ' L' },
     ];
     let itemsHtml = metrics.map(m => `<div class="summary-item"><span class="summary-label">${m.label}</span><span class="summary-value ${m.className || ''} hidden">${m.value}${m.unit}</span></div>`).join('');
+    // window.toggleAllSummaryValues는 main.js에서 전역으로 등록되어 있어야 함
     return `<strong>${title}</strong><div class="summary-toggle-grid" onclick="window.toggleAllSummaryValues(this)">${itemsHtml}</div>`;
 }
 
+// [오늘] 탭 기록 표시
 export function displayTodayRecords(date) {
     const todayTbody = document.querySelector('#today-records-table tbody');
     const todaySummaryDiv = document.getElementById('today-summary');
     
+    if(!todayTbody) return;
+
     const dayRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time) === date)
                                   .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     
@@ -81,6 +88,7 @@ export function displayTodayRecords(date) {
 
     displayList.forEach(r => {
         const tr = document.createElement('tr');
+        // ui.js에서 import한 editRecord 사용
         tr.onclick = () => editRecord(r.id);
 
         let timeDisplay = r.time;
@@ -166,9 +174,10 @@ export function displayTodayRecords(date) {
         
         todayTbody.appendChild(tr);
     });
-    todaySummaryDiv.innerHTML = createSummaryHTML('오늘의 기록 (04시 기준)', dayRecords);
+    if(todaySummaryDiv) todaySummaryDiv.innerHTML = createSummaryHTML('오늘의 기록 (04시 기준)', dayRecords);
 }
 
+// [설정] 탭 주유 내역 표시
 export function displaySubsidyRecords(append = false) {
     const subsidyRecordsList = document.getElementById('subsidy-records-list');
     const subsidyLoadMoreContainer = document.getElementById('subsidy-load-more-container');
@@ -176,12 +185,12 @@ export function displaySubsidyRecords(append = false) {
     
     if (!append) { 
         displayedSubsidyCount = 0; 
-        subsidyRecordsList.innerHTML = ''; 
+        if(subsidyRecordsList) subsidyRecordsList.innerHTML = ''; 
     }
     
     if (fuelRecords.length === 0) { 
-        subsidyRecordsList.innerHTML = '<p class="note" style="text-align:center; padding:1em;">주유 내역이 없습니다.</p>'; 
-        subsidyLoadMoreContainer.innerHTML = ''; 
+        if(subsidyRecordsList) subsidyRecordsList.innerHTML = '<p class="note" style="text-align:center; padding:1em;">주유 내역이 없습니다.</p>'; 
+        if(subsidyLoadMoreContainer) subsidyLoadMoreContainer.innerHTML = ''; 
         return; 
     }
     
@@ -199,35 +208,46 @@ export function displaySubsidyRecords(append = false) {
                 <span>주유량: ${parseFloat(r.liters).toFixed(2)} L</span>
                 <span>단가: ${r.unitPrice} 원</span>
             </div>`;
-        subsidyRecordsList.appendChild(div);
+        if(subsidyRecordsList) subsidyRecordsList.appendChild(div);
     });
     
     displayedSubsidyCount += nextBatch.length;
     
-    if (displayedSubsidyCount < fuelRecords.length) { 
+    if (displayedSubsidyCount < fuelRecords.length && subsidyLoadMoreContainer) { 
         subsidyLoadMoreContainer.innerHTML = '<button class="load-more-btn" style="margin-top:10px; padding:10px;">▼ 더 보기</button>'; 
         subsidyLoadMoreContainer.querySelector('button').onclick = () => displaySubsidyRecords(true); 
-    } else { 
+    } else if (subsidyLoadMoreContainer) { 
         subsidyLoadMoreContainer.innerHTML = ''; 
     }
 }
 
+// [일별] 탭 표시
 export function displayDailyRecords() {
-    const year = document.getElementById('daily-year-select').value;
-    const month = document.getElementById('daily-month-select').value;
+    const yearSelect = document.getElementById('daily-year-select');
+    const monthSelect = document.getElementById('daily-month-select');
+    if(!yearSelect || !monthSelect) return;
+
+    const year = yearSelect.value;
+    const month = monthSelect.value;
     const selectedPeriod = `${year}-${month}`;
     const dailyTbody = document.querySelector('#daily-summary-table tbody');
     const dailySummaryDiv = document.getElementById('daily-summary');
+    
     const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(selectedPeriod));
-    dailyTbody.innerHTML = '';
-    dailySummaryDiv.classList.remove('hidden');
-    dailySummaryDiv.innerHTML = createSummaryHTML(`${parseInt(month)}월 총계 (04시 기준)`, monthRecords);
+    
+    if(dailyTbody) dailyTbody.innerHTML = '';
+    if(dailySummaryDiv) {
+        dailySummaryDiv.classList.remove('hidden');
+        dailySummaryDiv.innerHTML = createSummaryHTML(`${parseInt(month)}월 총계 (04시 기준)`, monthRecords);
+    }
+
     const recordsByDate = {};
     monthRecords.forEach(r => {
         const statDate = getStatisticalDate(r.date, r.time);
         if(!recordsByDate[statDate]) recordsByDate[statDate] = { records: [], income: 0, expense: 0, distance: 0, tripCount: 0 };
         recordsByDate[statDate].records.push(r);
     });
+
     Object.keys(recordsByDate).sort().reverse().forEach(date => {
         const dayData = recordsByDate[date];
         const transport = dayData.records.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
@@ -236,31 +256,45 @@ export function displayDailyRecords() {
             if(r.type !== '운행종료' && r.type !== '운행취소') { inc += safeInt(r.income); exp += safeInt(r.cost); }
             if(r.type === '화물운송') { dist += safeFloat(r.distance); count++; }
         });
+        
         if (count === 0) return;
+        
         const tr = document.createElement('tr');
         if(date === getTodayString()) tr.style.fontWeight = 'bold';
+        
+        // window.viewDateDetails는 main.js에서 전역 등록됨
         tr.innerHTML = `<td data-label="일">${parseInt(date.substring(8,10))}일</td><td data-label="수입"><span class="income">${formatToManwon(inc)}</span></td><td data-label="지출"><span class="cost">${formatToManwon(exp)}</span></td><td data-label="정산"><strong>${formatToManwon(inc-exp)}</strong></td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td><td data-label="관리"><button class="edit-btn" onclick="window.viewDateDetails('${date}')">상세</button></td>`;
-        dailyTbody.appendChild(tr);
+        if(dailyTbody) dailyTbody.appendChild(tr);
     });
 }
 
+// [주별] 탭 표시
 export function displayWeeklyRecords() {
-    const year = document.getElementById('weekly-year-select').value;
-    const month = document.getElementById('weekly-month-select').value;
+    const yearSelect = document.getElementById('weekly-year-select');
+    const monthSelect = document.getElementById('weekly-month-select');
+    if(!yearSelect || !monthSelect) return;
+
+    const year = yearSelect.value;
+    const month = monthSelect.value;
     const selectedPeriod = `${year}-${month}`;
     const weeklyTbody = document.querySelector('#weekly-summary-table tbody');
     const weeklySummaryDiv = document.getElementById('weekly-summary');
+    
     const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(selectedPeriod));
-    weeklyTbody.innerHTML = '';
-    weeklySummaryDiv.innerHTML = createSummaryHTML(`${parseInt(month)}월 주별`, monthRecords);
+    
+    if(weeklyTbody) weeklyTbody.innerHTML = '';
+    if(weeklySummaryDiv) weeklySummaryDiv.innerHTML = createSummaryHTML(`${parseInt(month)}월 주별`, monthRecords);
+    
     const weeks = {};
     monthRecords.forEach(r => {
         const statDate = getStatisticalDate(r.date, r.time);
         const d = new Date(statDate);
+        // 간단한 주차 계산 로직
         const w = Math.ceil((d.getDate() + (new Date(d.getFullYear(), d.getMonth(), 1).getDay())) / 7);
         if(!weeks[w]) weeks[w] = [];
         weeks[w].push(r);
     });
+
     Object.keys(weeks).forEach(w => {
         const data = weeks[w];
         const transport = data.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
@@ -272,17 +306,24 @@ export function displayWeeklyRecords() {
         const dates = data.map(r => new Date(getStatisticalDate(r.date, r.time)).getDate());
         const tr = document.createElement('tr');
         tr.innerHTML = `<td data-label="주차">${w}주차</td><td data-label="기간">${Math.min(...dates)}일~${Math.max(...dates)}일</td><td data-label="수입">${formatToManwon(inc)}</td><td data-label="지출">${formatToManwon(exp)}</td><td data-label="정산">${formatToManwon(inc-exp)}</td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td>`;
-        weeklyTbody.appendChild(tr);
+        if(weeklyTbody) weeklyTbody.appendChild(tr);
     });
 }
 
+// [월별] 탭 표시
 export function displayMonthlyRecords() {
-    const year = document.getElementById('monthly-year-select').value;
+    const yearSelect = document.getElementById('monthly-year-select');
+    if(!yearSelect) return;
+    
+    const year = yearSelect.value;
     const monthlyTbody = document.querySelector('#monthly-summary-table tbody');
     const monthlyYearlySummaryDiv = document.getElementById('monthly-yearly-summary');
+    
     const yearRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(year));
-    monthlyYearlySummaryDiv.innerHTML = createSummaryHTML(`${year}년`, yearRecords);
-    monthlyTbody.innerHTML = '';
+    
+    if(monthlyYearlySummaryDiv) monthlyYearlySummaryDiv.innerHTML = createSummaryHTML(`${year}년`, yearRecords);
+    if(monthlyTbody) monthlyTbody.innerHTML = '';
+    
     const months = {};
     yearRecords.forEach(r => { 
         const statDate = getStatisticalDate(r.date, r.time);
@@ -290,6 +331,7 @@ export function displayMonthlyRecords() {
         if(!months[m]) months[m]={records:[]}; 
         months[m].records.push(r); 
     });
+
     Object.keys(months).sort().reverse().forEach(m => {
         const data = months[m];
         const transport = data.records.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
@@ -300,41 +342,55 @@ export function displayMonthlyRecords() {
         });
         const tr = document.createElement('tr');
         tr.innerHTML = `<td data-label="월">${parseInt(m.substring(5))}월</td><td data-label="수입">${formatToManwon(inc)}</td><td data-label="지출">${formatToManwon(exp)}</td><td data-label="정산">${formatToManwon(inc-exp)}</td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td>`;
-        monthlyTbody.appendChild(tr);
+        if(monthlyTbody) monthlyTbody.appendChild(tr);
     });
 }
 
+// [설정] 탭: 실시간 요약 (04시 기준) - 카드 ID 오류 수정 적용됨
 export function displayCurrentMonthData() {
     const now = new Date();
     let checkDate = new Date();
+    // 04시 이전이면 전날 기준
     if(checkDate.getHours() < 4) checkDate.setDate(checkDate.getDate() - 1);
+    
     const currentPeriod = checkDate.toISOString().slice(0, 7); 
     const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(currentPeriod) && r.type !== '운행취소' && r.type !== '운행종료'); 
-    document.getElementById('current-month-title').textContent = `${parseInt(currentPeriod.split('-')[1])}월 실시간 요약 (04시 기준)`; 
+    
+    const titleEl = document.getElementById('current-month-title');
+    if(titleEl) titleEl.textContent = `${parseInt(currentPeriod.split('-')[1])}월 실시간 요약 (04시 기준)`; 
+    
     let inc = 0, exp = 0, count = 0, dist = 0, liters = 0; 
     monthRecords.forEach(r => { 
         inc += safeInt(r.income); exp += safeInt(r.cost); 
         if(r.type === '화물운송') { count++; dist += safeFloat(r.distance); } 
         if(r.type === '주유소') liters += safeFloat(r.liters); 
     }); 
+    
     const days = new Set(monthRecords.map(r => getStatisticalDate(r.date, r.time))).size; 
     const net = inc - exp; 
     const avg = liters > 0 && dist > 0 ? (dist/liters).toFixed(2) : 0; 
     const costKm = dist > 0 ? Math.round(exp/dist) : 0; 
-    document.getElementById('current-month-operating-days').textContent = `${days} 일`; 
-    document.getElementById('current-month-trip-count').textContent = `${count} 건`; 
-    document.getElementById('current-month-total-mileage').textContent = `${dist.toFixed(1)} km`; 
-    document.getElementById('current-month-income').textContent = `${formatToManwon(inc)} 만원`; 
-    document.getElementById('current-month-expense').textContent = `${formatToManwon(exp)} 만원`; 
-    document.getElementById('current-month-net-income').textContent = `${formatToManwon(net)} 만원`; 
-    document.getElementById('current-month-avg-economy').textContent = `${avg} km/L`; 
-    document.getElementById('current-month-cost-per-km').textContent = `${costKm.toLocaleString()} 원`; 
+    
+    // ID가 존재할 때만 값 할당 (오류 방지)
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+    
+    setTxt('current-month-operating-days', `${days} 일`); 
+    setTxt('current-month-trip-count', `${count} 건`); 
+    setTxt('current-month-total-mileage', `${dist.toFixed(1)} km`); 
+    setTxt('current-month-income', `${formatToManwon(inc)} 만원`); 
+    setTxt('current-month-expense', `${formatToManwon(exp)} 만원`); 
+    setTxt('current-month-net-income', `${formatToManwon(net)} 만원`); 
+    setTxt('current-month-avg-economy', `${avg} km/L`); 
+    setTxt('current-month-cost-per-km', `${costKm.toLocaleString()} 원`); 
+    
     const limit = parseFloat(localStorage.getItem("fuel_subsidy_limit")) || 0; 
     const remain = limit - liters; 
     const pct = limit > 0 ? Math.min(100, 100 * liters / limit).toFixed(1) : 0; 
-    document.getElementById('subsidy-summary').innerHTML = `<div class="progress-label">월 한도: ${limit.toLocaleString()} L | 사용: ${liters.toFixed(1)} L | 잔여: ${remain.toFixed(1)} L</div><div class="progress-bar-container"><div class="progress-bar progress-bar-used" style="width: ${pct}%;"></div></div>`; 
+    const subSum = document.getElementById('subsidy-summary');
+    if(subSum) subSum.innerHTML = `<div class="progress-label">월 한도: ${limit.toLocaleString()} L | 사용: ${liters.toFixed(1)} L | 잔여: ${remain.toFixed(1)} L</div><div class="progress-bar-container"><div class="progress-bar progress-bar-used" style="width: ${pct}%;"></div></div>`; 
 }
 
+// [설정] 탭: 누적 데이터
 export function displayCumulativeData() {
     const records = MEM_RECORDS.filter(r => r.type !== '운행취소' && r.type !== '운행종료');
     let inc = 0, exp = 0, count = 0, dist = 0, liters = 0;
@@ -343,23 +399,29 @@ export function displayCumulativeData() {
         if(r.type === '주유소') liters += safeFloat(r.liters);
         if(r.type === '화물운송') { count++; dist += safeFloat(r.distance); }
     });
+    
     const correction = parseFloat(localStorage.getItem("mileage_correction")) || 0;
     const totalDist = dist + correction;
     const net = inc - exp;
     const avg = liters > 0 && totalDist > 0 ? (totalDist/liters).toFixed(2) : 0;
     const costKm = totalDist > 0 ? Math.round(exp/totalDist) : 0;
     const days = new Set(records.map(r => getStatisticalDate(r.date, r.time))).size;
-    document.getElementById('cumulative-operating-days').textContent = `${days} 일`;
-    document.getElementById('cumulative-trip-count').textContent = `${count} 건`;
-    document.getElementById('cumulative-total-mileage').textContent = `${Math.round(totalDist).toLocaleString()} km`;
-    document.getElementById('cumulative-income').textContent = `${formatToManwon(inc)} 만원`;
-    document.getElementById('cumulative-expense').textContent = `${formatToManwon(exp)} 만원`;
-    document.getElementById('cumulative-net-income').textContent = `${formatToManwon(net)} 만원`;
-    document.getElementById('cumulative-avg-economy').textContent = `${avg} km/L`;
-    document.getElementById('cumulative-cost-per-km').textContent = `${costKm.toLocaleString()} 원`;
+    
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+
+    setTxt('cumulative-operating-days', `${days} 일`);
+    setTxt('cumulative-trip-count', `${count} 건`);
+    setTxt('cumulative-total-mileage', `${Math.round(totalDist).toLocaleString()} km`);
+    setTxt('cumulative-income', `${formatToManwon(inc)} 만원`);
+    setTxt('cumulative-expense', `${formatToManwon(exp)} 만원`);
+    setTxt('cumulative-net-income', `${formatToManwon(net)} 만원`);
+    setTxt('cumulative-avg-economy', `${avg} km/L`);
+    setTxt('cumulative-cost-per-km', `${costKm.toLocaleString()} 원`);
+    
     renderMileageSummary();
 }
 
+// [설정] 탭: 기간별 요약
 export function renderMileageSummary(period = 'monthly') {
     const validRecords = MEM_RECORDS.filter(r => ['화물운송'].includes(r.type));
     let summaryData = {};
@@ -392,9 +454,11 @@ export function renderMileageSummary(period = 'monthly') {
     for (const k in summaryData) {
         h += `<div class="metric-card"><span class="metric-label">${k}</span><span class="metric-value">${summaryData[k]} 건</span></div>`;
     }
-    document.getElementById('mileage-summary-cards').innerHTML = h;
+    const container = document.getElementById('mileage-summary-cards');
+    if(container) container.innerHTML = h;
 }
 
+// [설정] 탭: 인쇄 미리보기
 export function generatePrintView(year, month, period, isDetailed) {
     const sDay = period === 'second' ? 16 : 1;
     const eDay = period === 'first' ? 15 : 31;
