@@ -1,4 +1,4 @@
-/** 버전: 16.5 | 최종 수정일: 2025-12-27 (최근 2주 빈도수 버튼 추가) */
+/** cargo note style.css */
 
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; margin: 0; padding: 0.5em; background-color: #f5f5f5; }
 .container { max-width: 600px; margin: auto; background-color: white; padding: 0.8em; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -188,7 +188,7 @@ th { background-color: #f2f2f2; }
 .income { color: green; }
 .cost { color: red; }
 .net { color: #0056b3; }
-.hidden { display: none; }
+.hidden { display: none !important; }
 .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin-top: 1em; }
 .action-buttons button { width: 100%; margin: 0; }
 #export-json-btn { background-color: #5a6268; }
@@ -218,7 +218,7 @@ th { background-color: #f2f2f2; }
     background-color: #004085;
 }
 
-/* [추가] 2주 기준 빈도수 버튼 스타일 */
+/* [버튼 스타일] 상하차 5개 버튼 */
 .location-container {
     display: flex;
     flex-direction: column;
