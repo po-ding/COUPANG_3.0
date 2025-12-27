@@ -353,7 +353,7 @@ UI.els.btnUpdateRecord.addEventListener('click', () => {
     }
 });
 
-// 6. 현재 시간으로 종료
+// 6. 현재 시간으로 종료 (수정 모드)
 UI.els.btnEditEndTrip.addEventListener('click', () => {
     const nowTime = Utils.getCurrentTimeString();
     const nowDate = Utils.getTodayString();
@@ -376,7 +376,7 @@ UI.els.btnEditEndTrip.addEventListener('click', () => {
     updateAllDisplays();
 });
 
-// [추가] 6-1. 현재 시간으로 시작 (편집 모드)
+// [추가] 6-1. 현재 시간으로 시작 (수정 모드)
 UI.els.btnEditStartTrip.addEventListener('click', () => {
     const nowTime = Utils.getCurrentTimeString();
     const nowDate = Utils.getTodayString();
@@ -384,7 +384,7 @@ UI.els.btnEditStartTrip.addEventListener('click', () => {
     const index = Data.MEM_RECORDS.findIndex(r => r.id === id);
 
     if (index > -1) {
-        // 편집 중인 기록의 시간을 현재로 업데이트
+        // 편집 중인 기록의 시작 시간을 현재로 업데이트
         Data.MEM_RECORDS[index].date = nowDate;
         Data.MEM_RECORDS[index].time = nowTime;
         Data.saveData();

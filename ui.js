@@ -33,16 +33,16 @@ export const els = {
     generalActions: document.getElementById('general-actions'),
     editActions: document.getElementById('edit-actions'),
     
+    // 메인 화면 버튼들
     btnTripCancel: document.getElementById('btn-trip-cancel'),
     btnStartTrip: document.getElementById('btn-start-trip'),
-    btnRegisterTrip: document.getElementById('btn-register-trip'),
+    btnRegisterTrip: document.getElementById('btn-register-trip'), // [추가]
     btnEndTrip: document.getElementById('btn-end-trip'),
     btnSaveGeneral: document.getElementById('btn-save-general'),
     
-    // [추가] 수정 모드 시작 버튼
-    btnEditStartTrip: document.getElementById('btn-edit-start-trip'),
+    // 수정 모드 버튼들
+    btnEditStartTrip: document.getElementById('btn-edit-start-trip'), // [추가]
     btnEditEndTrip: document.getElementById('btn-edit-end-trip'),
-    
     btnUpdateRecord: document.getElementById('btn-update-record'),
     btnDeleteRecord: document.getElementById('btn-delete-record'),
     btnCancelEdit: document.getElementById('btn-cancel-edit'),
@@ -97,10 +97,10 @@ export function toggleUI() {
         els.editActions.classList.remove('hidden');
         if (type === '주유소' || type === '소모품' || type === '지출' || type === '수입') {
             els.btnEditEndTrip.classList.add('hidden');
-            els.btnEditStartTrip.classList.add('hidden'); // [추가] 비운송 시 숨김
+            els.btnEditStartTrip.classList.add('hidden'); // [추가]
         } else {
             els.btnEditEndTrip.classList.remove('hidden');
-            els.btnEditStartTrip.classList.remove('hidden'); // [추가] 운송 관련 시 표시
+            els.btnEditStartTrip.classList.remove('hidden'); // [추가]
         }
     }
 }
