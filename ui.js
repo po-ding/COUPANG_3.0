@@ -27,19 +27,18 @@ export const els = {
     supplyMileageInput: document.getElementById('supply-mileage'),
     costInput: document.getElementById('cost'),
     incomeInput: document.getElementById('income'),
-    
     tripActions: document.getElementById('trip-actions'),
     generalActions: document.getElementById('general-actions'),
     editActions: document.getElementById('edit-actions'),
     
-    // 버튼 정의 (HTML에 없으면 null이 되지만, 스크립트는 멈추지 않음)
+    // 버튼 정의
     btnTripCancel: document.getElementById('btn-trip-cancel'),
     btnStartTrip: document.getElementById('btn-start-trip'),
-    btnRegisterTrip: document.getElementById('btn-register-trip'), 
+    btnRegisterTrip: document.getElementById('btn-register-trip'), // [추가]
     btnEndTrip: document.getElementById('btn-end-trip'),
     btnSaveGeneral: document.getElementById('btn-save-general'),
     
-    btnEditStartTrip: document.getElementById('btn-edit-start-trip'), 
+    btnEditStartTrip: document.getElementById('btn-edit-start-trip'), // [추가]
     btnEditEndTrip: document.getElementById('btn-edit-end-trip'),
     btnUpdateRecord: document.getElementById('btn-update-record'),
     btnDeleteRecord: document.getElementById('btn-delete-record'),
@@ -250,10 +249,6 @@ export async function processReceiptImage(file) {
     const resultContainer = document.getElementById('ocr-result-container');
     if (!file || !statusDiv || !resultContainer) return;
     
-    // ... 기존 로직 유지 ...
-    // (긴 코드 생략, 기존과 동일)
-    
-    // 이 부분에서만 HTML 요소 체크가 필요하므로 생략하지 않고 간단히 처리
     document.getElementById('ocr-date').value = '';
     document.getElementById('ocr-time').value = '';
     document.getElementById('ocr-cost').value = '';
@@ -321,8 +316,6 @@ function parseReceiptText(text) {
     if (timeMatch) { document.getElementById('ocr-time').value = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`; } 
     else { document.getElementById('ocr-time').value = "12:00"; }
     
-    // ... 나머지 파싱 로직 (기존과 동일하되 요소 존재 확인) ...
-    // (간략화)
     const lines = text.split('\n');
     for (let line of lines) {
         const lineClean = line.replace(/\s/g, ''); 
@@ -331,18 +324,4 @@ function parseReceiptText(text) {
             if (!matches) return null;
             let lastVal = matches[matches.length - 1];
             if(lastVal.endsWith('.')) lastVal = lastVal.slice(0, -1);
-            return parseFloat(lastVal.replace(/,/g, ''));
-        };
-        if (lineClean.includes('주유금액') || lineClean.includes('승인금액')) { const val = extractNum(line); if (val && val > 1000) document.getElementById('ocr-cost').value = val; }
-        if (lineClean.includes('주유리터') || lineClean.includes('주유량')) { const val = extractNum(line); if (val) document.getElementById('ocr-liters').value = val; }
-        if (lineClean.includes('주유단가')) { const val = extractNum(line); if (val && val > 500 && val < 3000) document.getElementById('ocr-price').value = val; }
-        if (lineClean.includes('보조금액') || lineClean.includes('보조금')) { const val = extractNum(line); if (val) document.getElementById('ocr-subsidy').value = val; }
-        if (lineClean.includes('잔여한도')) { const val = extractNum(line); if (val) document.getElementById('ocr-remaining').value = val; }
-    }
-    const lit = parseFloat(document.getElementById('ocr-liters').value) || 0;
-    const price = parseInt(document.getElementById('ocr-price').value) || 0;
-    let cost = parseInt(document.getElementById('ocr-cost').value) || 0;
-    if (cost === 0 && lit > 0 && price > 0) { cost = Math.round(lit * price); document.getElementById('ocr-cost').value = cost; }
-    const subsidy = parseInt(document.getElementById('ocr-subsidy').value) || 0;
-    if (cost > 0) { document.getElementById('ocr-net-cost').value = cost - subsidy; }
-}
+  

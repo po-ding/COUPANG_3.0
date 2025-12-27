@@ -94,22 +94,16 @@ function initialSetup() {
     UI.resetForm();
     updateAllDisplays();
 
-    // OCR 이벤트
     const ocrInput = document.getElementById('ocr-input');
     if (ocrInput) {
         ocrInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) UI.processReceiptImage(e.target.files[0]);
         });
     }
-    // (OCR 나머지 리스너도 요소 확인 후 부착되도록 수정 생략 - 위 구조상 UI.js 내부는 이미 안전)
     
-    // OCR 저장 버튼 등
     const btnSaveOcr = document.getElementById('btn-save-ocr');
     if (btnSaveOcr) {
         btnSaveOcr.addEventListener('click', () => {
-            // ... (기존 OCR 저장 로직과 동일) ...
-            // 내용이 길어 생략, 기존 코드 참조
-            // 에러 안 나게 하려면 이 블록 안도 꼼꼼히 체크해야 함.
             const cost = parseInt(document.getElementById('ocr-cost')?.value) || 0;
             const liters = parseFloat(document.getElementById('ocr-liters')?.value) || 0;
             
@@ -175,9 +169,6 @@ function moveDate(offset) {
     Stats.displayTodayRecords(picker.value);
 }
 
-// *** 이벤트 리스너 안전하게 등록 (?. 사용) ***
-
-// 1. 운행 취소
 UI.els.btnTripCancel?.addEventListener('click', () => {
     const formData = UI.getFormDataWithoutTime();
     Data.addRecord({ id: Date.now(), date: Utils.getTodayString(), time: Utils.getCurrentTimeString(), ...formData, type: '운행취소' });
@@ -188,7 +179,6 @@ UI.els.btnTripCancel?.addEventListener('click', () => {
     updateAllDisplays();
 });
 
-// 2. 운행 시작 (GPS 시간)
 UI.els.btnStartTrip?.addEventListener('click', () => {
     const formData = UI.getFormDataWithoutTime();
     if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
@@ -200,7 +190,7 @@ UI.els.btnStartTrip?.addEventListener('click', () => {
     updateAllDisplays();
 });
 
-// [추가] 2-1. 운행 등록 (시간 입력 안함)
+// [추가] 운행 등록 (입력된 시간 사용)
 UI.els.btnRegisterTrip?.addEventListener('click', () => {
     const formData = UI.getFormDataWithoutTime();
     if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
@@ -212,7 +202,6 @@ UI.els.btnRegisterTrip?.addEventListener('click', () => {
     updateAllDisplays();
 });
 
-// 3. 운행 종료
 UI.els.btnEndTrip?.addEventListener('click', () => {
     Data.addRecord({ id: Date.now(), date: Utils.getTodayString(), time: Utils.getCurrentTimeString(), type: '운행종료', distance: 0, cost: 0, income: 0 });
     Utils.showToast('운행 종료되었습니다.');
@@ -222,7 +211,6 @@ UI.els.btnEndTrip?.addEventListener('click', () => {
     updateAllDisplays();
 });
 
-// 4. 일반 저장
 UI.els.btnSaveGeneral?.addEventListener('click', () => {
     const formData = UI.getFormDataWithoutTime();
     if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
@@ -237,7 +225,6 @@ UI.els.btnSaveGeneral?.addEventListener('click', () => {
     if(formData.type === '주유소') Stats.displaySubsidyRecords();
 });
 
-// 5. 수정 완료
 UI.els.btnUpdateRecord?.addEventListener('click', () => {
     const id = parseInt(UI.els.editIdInput.value);
     const index = Data.MEM_RECORDS.findIndex(r => r.id === id);
@@ -262,7 +249,24 @@ UI.els.btnUpdateRecord?.addEventListener('click', () => {
     }
 });
 
-// 6. 현재 시간으로 종료 (수정 모드)
+// [추가] 현재 시간으로 시작 (수정 모드)
+UI.els.btnEditStartTrip?.addEventListener('click', () => {
+    const nowTime = Utils.getCurrentTimeString();
+    const nowDate = Utils.getTodayString();
+    const id = parseInt(UI.els.editIdInput.value);
+    const index = Data.MEM_RECORDS.findIndex(r => r.id === id);
+    if (index > -1) {
+        Data.MEM_RECORDS[index].date = nowDate;
+        Data.MEM_RECORDS[index].time = nowTime;
+        Data.saveData();
+        Utils.showToast('시작 시간이 현재로 업데이트됨.');
+        UI.resetForm();
+        const statDate = Utils.getStatisticalDate(nowDate, nowTime);
+        if(document.getElementById('today-date-picker')) document.getElementById('today-date-picker').value = statDate;
+        updateAllDisplays();
+    }
+});
+
 UI.els.btnEditEndTrip?.addEventListener('click', () => {
     const nowTime = Utils.getCurrentTimeString();
     const nowDate = Utils.getTodayString();
@@ -283,25 +287,6 @@ UI.els.btnEditEndTrip?.addEventListener('click', () => {
     updateAllDisplays();
 });
 
-// [추가] 6-1. 현재 시간으로 시작 (수정 모드)
-UI.els.btnEditStartTrip?.addEventListener('click', () => {
-    const nowTime = Utils.getCurrentTimeString();
-    const nowDate = Utils.getTodayString();
-    const id = parseInt(UI.els.editIdInput.value);
-    const index = Data.MEM_RECORDS.findIndex(r => r.id === id);
-    if (index > -1) {
-        Data.MEM_RECORDS[index].date = nowDate;
-        Data.MEM_RECORDS[index].time = nowTime;
-        Data.saveData();
-        Utils.showToast('시작 시간이 현재로 업데이트됨.');
-        UI.resetForm();
-        const statDate = Utils.getStatisticalDate(nowDate, nowTime);
-        if(document.getElementById('today-date-picker')) document.getElementById('today-date-picker').value = statDate;
-        updateAllDisplays();
-    }
-});
-
-// 7. 삭제
 UI.els.btnDeleteRecord?.addEventListener('click', () => {
     if(confirm('삭제하시겠습니까?')) {
         const id = parseInt(UI.els.editIdInput.value);

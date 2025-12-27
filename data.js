@@ -1,5 +1,3 @@
---- START OF FILE data.js ---
-
 export let MEM_RECORDS = [];
 export let MEM_LOCATIONS = {};
 export let MEM_FARES = {};
