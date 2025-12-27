@@ -18,9 +18,7 @@
             </div>
         </div>
         
-        <div id="edit-mode-indicator" class="hidden">
-            <span>⚠️ 기록 수정 중 (시간 변경 불가)</span>
-        </div>
+        <div id="edit-mode-indicator" class="hidden"><span>⚠️ 기록 수정 중</span></div>
 
         <div id="main-page">
             <form id="record-form" onsubmit="return false;">
@@ -77,14 +75,14 @@
 
                 <fieldset id="expense-details" class="hidden">
                     <legend id="expense-legend">내역 입력</legend>
-                    <input type="text" id="expense-item" list="expense-list" placeholder="내역 (식대, 통행료, 기타수입 등)">
+                    <input type="text" id="expense-item" list="expense-list" placeholder="내역">
                     <datalist id="expense-list"></datalist>
                 </fieldset>
 
                 <fieldset id="supply-details" class="hidden">
                     <legend>소모품 내역</legend>
-                    <input type="text" id="supply-item" placeholder="품목 (엔진오일 등)">
-                    <input type="number" id="supply-mileage" placeholder="교체 시점 주행거리(km)">
+                    <input type="text" id="supply-item" placeholder="품목">
+                    <input type="number" id="supply-mileage" placeholder="교체 거리(km)">
                 </fieldset>
 
                 <fieldset id="cost-info-fieldset">
@@ -97,7 +95,6 @@
                     </div>
                 </fieldset>
 
-                <!-- 버튼 순서: 등록 -> 시작 -> 종료 -> 취소 -->
                 <div id="trip-actions" class="action-btn-group">
                     <button type="button" id="btn-register-trip" style="background-color: #28a745;">운행 등록</button>
                     <button type="button" id="btn-start-trip">운행 시작</button>
@@ -111,7 +108,6 @@
 
                 <div id="edit-actions" class="action-btn-group hidden">
                     <div style="display:flex; flex-direction:column; gap:5px; width:100%;">
-                        <!-- 수정 모드 버튼 -->
                         <div style="display:flex; gap:5px; width:100%;">
                             <button type="button" id="btn-edit-start-trip" style="background-color: #007bff; flex:1;">현재 시간으로 운행 시작</button>
                             <button type="button" id="btn-edit-end-trip" style="background-color: #17a2b8; flex:1;">현재 시간으로 운행 종료</button>
@@ -173,7 +169,6 @@
         <div id="settings-page" class="hidden">
             <div class="data-summary-section">
                 <h2>데이터 요약</h2>
-                <!-- ID가 부여된 카드 구조 -->
                 <div id="current-month-summary-container">
                     <h4 id="current-month-title"></h4>
                     <div class="summary-grid">
@@ -223,114 +218,40 @@
 
             <h2 id="toggle-center-management" class="collapsible-header">운송 지역 관리</h2>
             <div id="center-management-body" class="collapsible-body hidden">
-                <fieldset>
-                    <legend>새 지역 추가</legend>
-                    <div class="input-group">
-                        <input type="text" id="new-center-name" placeholder="추가할 지역 이름">
-                        <input type="text" id="new-center-address" placeholder="주소 (선택)">
-                        <input type="text" id="new-center-memo" placeholder="메모 (선택)">
-                        <button type="button" id="add-center-btn">추가</button>
-                    </div>
-                </fieldset>
-                <fieldset>
-                    <legend>등록된 지역 목록</legend>
-                    <input type="text" id="center-search-input" placeholder="지역 검색..." style="margin-bottom: 0.5em;">
-                    <div id="center-list-container"></div>
-                </fieldset>
+                <!-- 지역 관리 내용 생략 (동적 생성) -->
+                <input type="text" id="new-center-name" placeholder="추가할 지역 이름"><button id="add-center-btn">추가</button>
+                <input type="text" id="center-search-input" placeholder="검색"><div id="center-list-container"></div>
             </div>
 
             <h2 id="toggle-batch-apply" class="collapsible-header">운임 일괄 적용</h2>
             <div id="batch-apply-body" class="collapsible-body hidden">
-                <fieldset>
-                    <legend>미정산 구간 운임 입력</legend>
-                    <div class="input-group row">
-                        <input type="text" id="batch-from-center" list="center-list" placeholder="상차지 검색">
-                        <input type="text" id="batch-to-center" list="center-list" placeholder="하차지 검색">
-                    </div>
-                    <input type="number" id="batch-income" step="0.01" placeholder="적용할 운송 수입 (만원)">
-                    <button type="button" id="batch-apply-btn">일괄 적용하기</button>
-                    <div id="batch-status"></div>
-                </fieldset>
+                <input type="text" id="batch-from-center" placeholder="상차"><input type="text" id="batch-to-center" placeholder="하차">
+                <input type="number" id="batch-income"><button id="batch-apply-btn">적용</button><div id="batch-status"></div>
             </div>
             
             <h2 id="toggle-subsidy-management" class="collapsible-header">유가보조금 관리</h2>
             <div id="subsidy-management-body" class="collapsible-body hidden">
-                <fieldset>
-                    <legend>월 한도 설정</legend>
-                    <div class="input-group">
-                        <input type="number" id="subsidy-limit" placeholder="월 한도 (L) 입력">
-                        <button type="button" id="subsidy-save-btn" class="setting-save-btn">설정 저장</button>
-                    </div>
-                </fieldset>
-                
-                <fieldset>
-                    <legend>📷 영수증/캡쳐 인식 (베타)</legend>
-                    <div class="input-group">
-                        <label for="ocr-input" class="file-upload-btn">📷 영수증 이미지 선택</label>
-                        <input type="file" id="ocr-input" accept="image/*" class="hidden">
-                    </div>
-                    <div id="ocr-status" class="note" style="margin-top:5px; text-align:center;"></div>
-                    <div id="ocr-result-container" class="hidden" style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px;">
-                        <h4>인식 결과 확인</h4>
-                        <div class="input-group row">
-                            <input type="date" id="ocr-date">
-                            <input type="time" id="ocr-time">
-                        </div>
-                        <div class="input-group row">
-                            <input type="number" id="ocr-cost" placeholder="주유금액 (원)">
-                            <input type="number" id="ocr-subsidy" placeholder="보조금액 (원)">
-                        </div>
-                        <div class="input-group row">
-                            <input type="number" id="ocr-net-cost" placeholder="실지출(차감) 금액" readonly style="background-color: #f8f9fa; font-weight: bold; color: #007bff;">
-                            <input type="number" id="ocr-liters" placeholder="주유리터 (L)">
-                        </div>
-                        <div class="input-group row">
-                            <input type="number" id="ocr-price" placeholder="주유단가 (원)">
-                            <input type="number" id="ocr-remaining" placeholder="잔여한도 (L) - 참고용">
-                        </div>
-                        <div style="display:flex; gap:5px; margin-top:10px;">
-                            <button type="button" id="btn-retry-ocr" style="background-color: #6c757d;">재인식</button>
-                            <button type="button" id="btn-save-ocr" style="background-color: #28a745;">저장하기</button>
-                        </div>
-                    </div>
-                </fieldset>
-
-                <div id="subsidy-summary" class="subsidy-summary"></div>
-                <div id="subsidy-records-container">
-                    <h4>전체 주유 내역</h4>
-                    <div id="subsidy-records-list"></div>
-                    <div id="subsidy-load-more-container"></div>
+                <input type="number" id="subsidy-limit"><button id="subsidy-save-btn">저장</button>
+                <input type="file" id="ocr-input" class="hidden"><label for="ocr-input" class="file-upload-btn">영수증</label>
+                <div id="ocr-status"></div>
+                <div id="ocr-result-container" class="hidden">
+                    <input id="ocr-date"><input id="ocr-time"><input id="ocr-cost"><input id="ocr-subsidy">
+                    <input id="ocr-net-cost"><input id="ocr-liters"><input id="ocr-price"><input id="ocr-remaining">
+                    <button id="btn-retry-ocr">재인식</button><button id="btn-save-ocr">저장</button>
                 </div>
+                <div id="subsidy-summary"></div><div id="subsidy-records-container"><div id="subsidy-records-list"></div><div id="subsidy-load-more-container"></div></div>
             </div>
 
             <h2 id="toggle-print-management" class="collapsible-header">기간별 운송 내역 출력</h2>
             <div id="print-management-body" class="collapsible-body hidden">
-                <fieldset>
-                    <legend>조회 기간 선택</legend>
-                    <div class="selector-group">
-                        <select id="print-year-select"></select>
-                        <select id="print-month-select"></select>
-                    </div>
-                    <div class="action-btn-group">
-                        <button type="button" id="print-first-half-btn">1~15일 간편 출력</button>
-                        <button type="button" id="print-second-half-btn">16~말일 간편 출력</button>
-                        <button type="button" id="print-full-month-btn">1~말일 간편 출력</button>
-                    </div>
-                    <div class="action-btn-group" style="margin-top: 0.5em;">
-                        <button type="button" id="print-first-half-detail-btn">1~15일 상세 출력</button>
-                        <button type="button" id="print-second-half-detail-btn">16~말일 상세 출력</button>
-                        <button type="button" id="print-full-month-detail-btn">1~말일 상세 출력</button>
-                    </div>
-                </fieldset>
+                <select id="print-year-select"></select><select id="print-month-select"></select>
+                <button id="print-first-half-btn">1~15</button><button id="print-second-half-btn">16~말</button><button id="print-full-month-btn">전체</button>
+                <button id="print-first-half-detail-btn">1~15상세</button><button id="print-second-half-detail-btn">16~말상세</button><button id="print-full-month-detail-btn">전체상세</button>
             </div>
 
             <h2 id="toggle-data-management" class="collapsible-header">데이터 관리</h2>
             <div id="data-management-body" class="collapsible-body hidden">
-                <div class="action-buttons">
-                    <button type="button" id="export-json-btn">JSON 저장 (백업)</button>
-                    <button type="button" id="import-json-btn">JSON 복원</button>
-                    <button type="button" id="clear-btn">전체 데이터 삭제</button>
-                </div>
+                <button id="export-json-btn">저장</button><button id="import-json-btn">복원</button><button id="clear-btn">삭제</button>
                 <input type="file" id="import-file-input" class="hidden" accept=".json">
             </div>
         </div>

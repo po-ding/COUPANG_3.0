@@ -27,10 +27,8 @@ export const els = {
     supplyMileageInput: document.getElementById('supply-mileage'),
     costInput: document.getElementById('cost'),
     incomeInput: document.getElementById('income'),
-    tripActions: document.getElementById('trip-actions'),
-    generalActions: document.getElementById('general-actions'),
-    editActions: document.getElementById('edit-actions'),
     
+    // 버튼들
     btnTripCancel: document.getElementById('btn-trip-cancel'),
     btnStartTrip: document.getElementById('btn-start-trip'),
     btnRegisterTrip: document.getElementById('btn-register-trip'),
@@ -47,6 +45,11 @@ export const els = {
     editIdInput: document.getElementById('edit-id'),
     centerManagementBody: document.getElementById('center-management-body'),
     centerListContainer: document.getElementById('center-list-container'),
+    
+    // 섹션
+    tripActions: document.getElementById('trip-actions'),
+    generalActions: document.getElementById('general-actions'),
+    editActions: document.getElementById('edit-actions'),
 };
 
 export function toggleUI() {
@@ -66,8 +69,6 @@ export function toggleUI() {
         }
     } else if (type === '수입') {
         if(els.expenseDetails) els.expenseDetails.classList.remove('hidden'); 
-        const legend = document.getElementById('expense-legend');
-        if(legend) legend.textContent = "수입 내역";
         if(els.costInfoFieldset) els.costInfoFieldset.classList.remove('hidden');
         if(els.incomeWrapper) els.incomeWrapper.classList.remove('hidden');
         if(els.costWrapper) els.costWrapper.classList.add('hidden');
@@ -85,8 +86,6 @@ export function toggleUI() {
             if (!isEditMode && els.generalActions) els.generalActions.classList.remove('hidden');
         } else if (type === '지출') {
             if(els.expenseDetails) els.expenseDetails.classList.remove('hidden');
-            const legend = document.getElementById('expense-legend');
-            if(legend) legend.textContent = "지출 내역";
             if (!isEditMode && els.generalActions) els.generalActions.classList.remove('hidden');
         }
     }
@@ -189,151 +188,4 @@ export function editRecord(id) {
     els.timeInput.disabled = true;
     toggleUI(); 
     window.scrollTo(0,0);
-}
-
-export function displayCenterList(filter='') {
-    if(!els.centerListContainer) return;
-    els.centerListContainer.innerHTML = "";
-    const list = MEM_CENTERS.filter(c => c.includes(filter));
-    if(list.length===0) { 
-        els.centerListContainer.innerHTML='<p class="note">결과 없음</p>'; 
-        return; 
-    } 
-    list.forEach(c => {
-        const l = MEM_LOCATIONS[c]||{};
-        const div = document.createElement('div');
-        div.className='center-item';
-        div.innerHTML=`<div class="info"><span class="center-name">${c}</span><div class="action-buttons"><button class="edit-btn">수정</button><button class="delete-btn">삭제</button></div></div>${l.address?`<span class="note">주소: ${l.address}</span>`:''}`;
-        
-        div.querySelector('.edit-btn').onclick = () => handleCenterEdit(div,c);
-        div.querySelector('.delete-btn').onclick = () => {
-            if(!confirm('삭제?')) return;
-            const idx = MEM_CENTERS.indexOf(c);
-            if(idx>-1) MEM_CENTERS.splice(idx,1);
-            delete MEM_LOCATIONS[c];
-            saveData();
-            displayCenterList(document.getElementById('center-search-input').value);
-        };
-        els.centerListContainer.appendChild(div);
-    });
-}
-
-function handleCenterEdit(div, c) {
-    const l = MEM_LOCATIONS[c]||{};
-    div.innerHTML = `<div class="edit-form"><input class="edit-input" value="${c}"><input class="edit-address-input" value="${l.address||''}"><input class="edit-memo-input" value="${l.memo||''}"><div class="action-buttons"><button class="setting-save-btn">저장</button><button class="cancel-edit-btn">취소</button></div></div>`;
-    
-    div.querySelector('.setting-save-btn').onclick = () => {
-        const nn = div.querySelector('.edit-input').value.trim();
-        const na = div.querySelector('.edit-address-input').value.trim();
-        const nm = div.querySelector('.edit-memo-input').value.trim();
-        if(!nn) return;
-        if(nn!==c) {
-            const idx = MEM_CENTERS.indexOf(c);
-            if(idx>-1) MEM_CENTERS.splice(idx,1);
-            if(!MEM_CENTERS.includes(nn)) MEM_CENTERS.push(nn);
-            delete MEM_LOCATIONS[c];
-            MEM_RECORDS.forEach(r => { if(r.from===c) r.from=nn; if(r.to===c) r.to=nn; });
-            MEM_CENTERS.sort();
-            saveData();
-        }
-        updateLocationData(nn, na, nm);
-        displayCenterList(document.getElementById('center-search-input').value);
-    };
-    div.querySelector('.cancel-edit-btn').onclick = () => displayCenterList(document.getElementById('center-search-input').value);
-}
-
-export async function processReceiptImage(file) {
-    const statusDiv = document.getElementById('ocr-status');
-    const resultContainer = document.getElementById('ocr-result-container');
-    if (!file || !statusDiv || !resultContainer) return;
-    
-    document.getElementById('ocr-date').value = '';
-    document.getElementById('ocr-time').value = '';
-    document.getElementById('ocr-cost').value = '';
-    document.getElementById('ocr-liters').value = '';
-    document.getElementById('ocr-price').value = '';
-    document.getElementById('ocr-subsidy').value = '';   
-    document.getElementById('ocr-remaining').value = ''; 
-    document.getElementById('ocr-net-cost').value = ''; 
-
-    resultContainer.classList.add('hidden');
-    statusDiv.innerHTML = "⏳ 이미지 전처리 및 분석 중... (약 5초 소요)";
-    statusDiv.style.color = "#007bff";
-
-    try {
-        const processedImage = await preprocessImage(file);
-        const { data: { text } } = await Tesseract.recognize(processedImage, 'kor+eng', { logger: m => { if(m.status === 'recognizing text') statusDiv.textContent = `⏳ 글자 인식 중... ${(m.progress * 100).toFixed(0)}%`; } });
-        statusDiv.innerHTML = "✅ 분석 완료! 내용을 확인해주세요.";
-        statusDiv.style.color = "green";
-        resultContainer.classList.remove('hidden');
-        parseReceiptText(text);
-    } catch (error) {
-        console.error(error);
-        statusDiv.innerHTML = "❌ 분석 실패. 이미지를 다시 선택해주세요.";
-        statusDiv.style.color = "red";
-    }
-}
-
-function preprocessImage(file) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const maxDim = 1500;
-                let width = img.width, height = img.height;
-                if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; } 
-                else if (height > width && height > maxDim) { width *= maxDim / height; height = maxDim; }
-                canvas.width = width; canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-                const imageData = ctx.getImageData(0, 0, width, height);
-                const data = imageData.data;
-                const threshold = 210; 
-                for (let i = 0; i < data.length; i += 4) {
-                    const gray = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
-                    const value = gray < threshold ? 0 : 255;
-                    data[i] = data[i+1] = data[i+2] = value;
-                }
-                ctx.putImageData(imageData, 0, 0);
-                canvas.toBlob((blob) => resolve(URL.createObjectURL(blob)));
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
-function parseReceiptText(text) {
-    let cleanText = text.replace(/\s+/g, ' ');
-    const dateMatch = text.match(/(\d{4})[-.,/년\s]+(\d{1,2})[-.,/월\s]+(\d{1,2})/);
-    if (dateMatch) { document.getElementById('ocr-date').value = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`; } 
-    else { document.getElementById('ocr-date').value = getTodayString(); }
-    const timeMatch = text.match(/(\d{1,2})\s*:\s*(\d{2})/);
-    if (timeMatch) { document.getElementById('ocr-time').value = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`; } 
-    else { document.getElementById('ocr-time').value = "12:00"; }
-    
-    const lines = text.split('\n');
-    for (let line of lines) {
-        const lineClean = line.replace(/\s/g, ''); 
-        const extractNum = (str) => {
-            const matches = str.match(/[\d,.]+/g);
-            if (!matches) return null;
-            let lastVal = matches[matches.length - 1];
-            if(lastVal.endsWith('.')) lastVal = lastVal.slice(0, -1);
-            return parseFloat(lastVal.replace(/,/g, ''));
-        };
-        if (lineClean.includes('주유금액') || lineClean.includes('승인금액')) { const val = extractNum(line); if (val && val > 1000) document.getElementById('ocr-cost').value = val; }
-        if (lineClean.includes('주유리터') || lineClean.includes('주유량')) { const val = extractNum(line); if (val) document.getElementById('ocr-liters').value = val; }
-        if (lineClean.includes('주유단가')) { const val = extractNum(line); if (val && val > 500 && val < 3000) document.getElementById('ocr-price').value = val; }
-        if (lineClean.includes('보조금액') || lineClean.includes('보조금')) { const val = extractNum(line); if (val) document.getElementById('ocr-subsidy').value = val; }
-        if (lineClean.includes('잔여한도')) { const val = extractNum(line); if (val) document.getElementById('ocr-remaining').value = val; }
-    }
-    const lit = parseFloat(document.getElementById('ocr-liters').value) || 0;
-    const price = parseInt(document.getElementById('ocr-price').value) || 0;
-    let cost = parseInt(document.getElementById('ocr-cost').value) || 0;
-    if (cost === 0 && lit > 0 && price > 0) { cost = Math.round(lit * price); document.getElementById('ocr-cost').value = cost; }
-    const subsidy = parseInt(document.getElementById('ocr-subsidy').value) || 0;
-    if (cost > 0) { document.getElementById('ocr-net-cost').value = cost - subsidy; }
 }

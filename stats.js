@@ -2,10 +2,8 @@ import { formatToManwon, getStatisticalDate, getTodayString } from './utils.js';
 import { MEM_RECORDS, MEM_LOCATIONS } from './data.js';
 import { editRecord } from './ui.js';
 
-// 전역 변수 (페이징용)
 let displayedSubsidyCount = 0;
 
-// 안전한 숫자 변환 유틸리티
 function safeInt(value) {
     if (!value) return 0;
     const num = parseInt(String(value).replace(/,/g, ''), 10);
@@ -18,7 +16,6 @@ function safeFloat(value) {
     return isNaN(num) ? 0 : num;
 }
 
-// 총 소요 시간 계산
 export function calculateTotalDuration(records) {
     const sorted = [...records].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     let totalMinutes = 0;
@@ -35,9 +32,7 @@ export function calculateTotalDuration(records) {
     return `${hours}h ${minutes}m`;
 }
 
-// 상단 요약 HTML 생성 (토글 기능 포함)
 export function createSummaryHTML(title, records) {
-    // 운행취소와 운행종료는 통계 제외
     const validRecords = records.filter(r => r.type !== '운행취소' && r.type !== '운행종료');
     let totalIncome = 0, totalExpense = 0, totalDistance = 0, totalTripCount = 0;
     let totalFuelCost = 0, totalFuelLiters = 0;
@@ -45,12 +40,10 @@ export function createSummaryHTML(title, records) {
     validRecords.forEach(r => {
         totalIncome += safeInt(r.income);
         totalExpense += safeInt(r.cost);
-        
         if (r.type === '주유소') { 
             totalFuelCost += safeInt(r.cost); 
             totalFuelLiters += safeFloat(r.liters); 
         }
-        
         if (['화물운송'].includes(r.type)) { 
             totalDistance += safeFloat(r.distance); 
             totalTripCount++; 
@@ -69,11 +62,9 @@ export function createSummaryHTML(title, records) {
         { label: '주유리터', value: totalFuelLiters.toFixed(2), unit: ' L' },
     ];
     let itemsHtml = metrics.map(m => `<div class="summary-item"><span class="summary-label">${m.label}</span><span class="summary-value ${m.className || ''} hidden">${m.value}${m.unit}</span></div>`).join('');
-    // window.toggleAllSummaryValues는 main.js에서 전역으로 등록되어 있어야 함
     return `<strong>${title}</strong><div class="summary-toggle-grid" onclick="window.toggleAllSummaryValues(this)">${itemsHtml}</div>`;
 }
 
-// [오늘] 탭 기록 표시
 export function displayTodayRecords(date) {
     const todayTbody = document.querySelector('#today-records-table tbody');
     const todaySummaryDiv = document.getElementById('today-summary');
@@ -88,7 +79,6 @@ export function displayTodayRecords(date) {
 
     displayList.forEach(r => {
         const tr = document.createElement('tr');
-        // ui.js에서 import한 editRecord 사용
         tr.onclick = () => editRecord(r.id);
 
         let timeDisplay = r.time;
@@ -177,7 +167,6 @@ export function displayTodayRecords(date) {
     if(todaySummaryDiv) todaySummaryDiv.innerHTML = createSummaryHTML('오늘의 기록 (04시 기준)', dayRecords);
 }
 
-// [설정] 탭 주유 내역 표시
 export function displaySubsidyRecords(append = false) {
     const subsidyRecordsList = document.getElementById('subsidy-records-list');
     const subsidyLoadMoreContainer = document.getElementById('subsidy-load-more-container');
@@ -221,7 +210,6 @@ export function displaySubsidyRecords(append = false) {
     }
 }
 
-// [일별] 탭 표시
 export function displayDailyRecords() {
     const yearSelect = document.getElementById('daily-year-select');
     const monthSelect = document.getElementById('daily-month-select');
@@ -262,13 +250,11 @@ export function displayDailyRecords() {
         const tr = document.createElement('tr');
         if(date === getTodayString()) tr.style.fontWeight = 'bold';
         
-        // window.viewDateDetails는 main.js에서 전역 등록됨
         tr.innerHTML = `<td data-label="일">${parseInt(date.substring(8,10))}일</td><td data-label="수입"><span class="income">${formatToManwon(inc)}</span></td><td data-label="지출"><span class="cost">${formatToManwon(exp)}</span></td><td data-label="정산"><strong>${formatToManwon(inc-exp)}</strong></td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td><td data-label="관리"><button class="edit-btn" onclick="window.viewDateDetails('${date}')">상세</button></td>`;
         if(dailyTbody) dailyTbody.appendChild(tr);
     });
 }
 
-// [주별] 탭 표시
 export function displayWeeklyRecords() {
     const yearSelect = document.getElementById('weekly-year-select');
     const monthSelect = document.getElementById('weekly-month-select');
@@ -289,7 +275,6 @@ export function displayWeeklyRecords() {
     monthRecords.forEach(r => {
         const statDate = getStatisticalDate(r.date, r.time);
         const d = new Date(statDate);
-        // 간단한 주차 계산 로직
         const w = Math.ceil((d.getDate() + (new Date(d.getFullYear(), d.getMonth(), 1).getDay())) / 7);
         if(!weeks[w]) weeks[w] = [];
         weeks[w].push(r);
@@ -310,7 +295,6 @@ export function displayWeeklyRecords() {
     });
 }
 
-// [월별] 탭 표시
 export function displayMonthlyRecords() {
     const yearSelect = document.getElementById('monthly-year-select');
     if(!yearSelect) return;
@@ -346,11 +330,9 @@ export function displayMonthlyRecords() {
     });
 }
 
-// [설정] 탭: 실시간 요약 (04시 기준) - 카드 ID 오류 수정 적용됨
 export function displayCurrentMonthData() {
     const now = new Date();
     let checkDate = new Date();
-    // 04시 이전이면 전날 기준
     if(checkDate.getHours() < 4) checkDate.setDate(checkDate.getDate() - 1);
     
     const currentPeriod = checkDate.toISOString().slice(0, 7); 
@@ -371,7 +353,6 @@ export function displayCurrentMonthData() {
     const avg = liters > 0 && dist > 0 ? (dist/liters).toFixed(2) : 0; 
     const costKm = dist > 0 ? Math.round(exp/dist) : 0; 
     
-    // ID가 존재할 때만 값 할당 (오류 방지)
     const setTxt = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
     
     setTxt('current-month-operating-days', `${days} 일`); 
@@ -390,7 +371,6 @@ export function displayCurrentMonthData() {
     if(subSum) subSum.innerHTML = `<div class="progress-label">월 한도: ${limit.toLocaleString()} L | 사용: ${liters.toFixed(1)} L | 잔여: ${remain.toFixed(1)} L</div><div class="progress-bar-container"><div class="progress-bar progress-bar-used" style="width: ${pct}%;"></div></div>`; 
 }
 
-// [설정] 탭: 누적 데이터
 export function displayCumulativeData() {
     const records = MEM_RECORDS.filter(r => r.type !== '운행취소' && r.type !== '운행종료');
     let inc = 0, exp = 0, count = 0, dist = 0, liters = 0;
@@ -421,7 +401,6 @@ export function displayCumulativeData() {
     renderMileageSummary();
 }
 
-// [설정] 탭: 기간별 요약
 export function renderMileageSummary(period = 'monthly') {
     const validRecords = MEM_RECORDS.filter(r => ['화물운송'].includes(r.type));
     let summaryData = {};
@@ -458,7 +437,6 @@ export function renderMileageSummary(period = 'monthly') {
     if(container) container.innerHTML = h;
 }
 
-// [설정] 탭: 인쇄 미리보기
 export function generatePrintView(year, month, period, isDetailed) {
     const sDay = period === 'second' ? 16 : 1;
     const eDay = period === 'first' ? 15 : 31;
@@ -528,7 +506,6 @@ export function generatePrintView(year, month, period, isDetailed) {
     </head>
     <body>
         <h2>${year}년 ${month}월 ${periodStr} 운송 기록 (04시 기준)</h2>
-        
         <div class="summary">
             <p><strong>[요약]</strong> 근무일: ${workDays}일 | 운행건수: ${transportList.length}건 | 운행거리: ${transDist.toFixed(1)}km</p>
             <hr style="border:0; border-top:1px dashed #ccc; margin:10px 0;">
@@ -538,7 +515,6 @@ export function generatePrintView(year, month, period, isDetailed) {
             <hr style="border:0; border-top:2px solid #333; margin:10px 0;">
             <p class="txt-green" style="font-size: 1.4em;">[ = ] 최종 순수익: ${finalProfit.toLocaleString()} 원</p>
         </div>
-
         <h3>1. 운송 내역</h3>
         <table>
             <thead>
