@@ -68,40 +68,26 @@ export function createSummaryHTML(title, records) {
 export function displayTodayRecords(date) {
     const todayTbody = document.querySelector('#today-records-table tbody');
     const todaySummaryDiv = document.getElementById('today-summary');
-    
     if(!todayTbody) return;
-
     const dayRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time) === date)
                                   .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-    
     todayTbody.innerHTML = '';
     const displayList = dayRecords.filter(r => r.type !== '운행종료');
-
     displayList.forEach(r => {
         const tr = document.createElement('tr');
-        
-        // [수정] 무조건 수정모드로 가는 onclick 제거 -> data-id로 식별
         tr.dataset.id = r.id; 
-
         let timeDisplay = r.time;
-        if(r.date !== date) { 
-            timeDisplay = `<span style="font-size:0.8em; color:#888;">(익일)</span> ${r.time}`;
-        }
-
+        if(r.date !== date) { timeDisplay = `<span style="font-size:0.8em; color:#888;">(익일)</span> ${r.time}`; }
         let money = '';
         const inc = safeInt(r.income);
         const cst = safeInt(r.cost);
-
         if(inc > 0) money += `<span class="income">+${formatToManwon(inc)}</span> `;
         if(cst > 0) money += `<span class="cost">-${formatToManwon(cst)}</span>`;
         if(money === '') money = '0'; 
-
         const isTransport = (r.type === '화물운송' || r.type === '대기' || r.type === '운행취소');
-
         if (isTransport) {
             let endTime = '진행중';
             let duration = '-';
-
             const idx = MEM_RECORDS.findIndex(item => item.id === r.id);
             if (idx > -1 && idx < MEM_RECORDS.length - 1) {
                 const next = MEM_RECORDS[idx + 1];
@@ -122,26 +108,20 @@ export function displayTodayRecords(date) {
             } else {
                 endTime = '진행중';
             }
-
             if(endTime === '진행중') tr.classList.add('row-in-progress');
             else tr.classList.add('row-completed');
-
             const fromVal = (r.from||'').replace(/"/g, '&quot;');
             const toVal = (r.to||'').replace(/"/g, '&quot;');
             const fromLoc = MEM_LOCATIONS[r.from] || {};
             const toLoc = MEM_LOCATIONS[r.to] || {};
-            
             let fromCell = `<span class="location-clickable" data-center="${fromVal}">${r.from || ''}</span>`;
             if (fromLoc.memo) fromCell += `<span class="table-memo">${fromLoc.memo}</span>`;
-            
             let toCell = `<span class="location-clickable" data-center="${toVal}">${r.to || ''}</span>`;
             if (toLoc.memo) toCell += `<span class="table-memo">${toLoc.memo}</span>`;
-            
             let noteCell = '';
             if(r.distance) noteCell = `<span class="note">${safeFloat(r.distance)} km</span>`;
             if(r.type === '대기') noteCell = `<span class="note">대기중</span>`;
             if(r.type === '운행취소') noteCell = `<span class="note cancelled">취소됨</span>`;
-
             tr.innerHTML = `<td data-label="시작">${timeDisplay}</td><td data-label="종료">${endTime}</td><td data-label="소요">${duration}</td><td data-label="상차">${fromCell}</td><td data-label="하차">${toCell}</td><td data-label="비고">${noteCell}</td><td data-label="금액">${money}</td>`;
         } else {
             const detail = r.expenseItem || r.supplyItem || r.brand || '';
@@ -154,89 +134,44 @@ export function displayTodayRecords(date) {
     if(todaySummaryDiv) todaySummaryDiv.innerHTML = createSummaryHTML('오늘의 기록 (04시 기준)', dayRecords);
 }
 
-export function displaySubsidyRecords(append = false) {
-    const subsidyRecordsList = document.getElementById('subsidy-records-list');
-    const subsidyLoadMoreContainer = document.getElementById('subsidy-load-more-container');
-    const fuelRecords = MEM_RECORDS.filter(r => r.type === '주유소').sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-    
-    if (!append) { 
-        displayedSubsidyCount = 0; 
-        if(subsidyRecordsList) subsidyRecordsList.innerHTML = ''; 
-    }
-    
-    if (fuelRecords.length === 0) { 
-        if(subsidyRecordsList) subsidyRecordsList.innerHTML = '<p class="note" style="text-align:center; padding:1em;">주유 내역이 없습니다.</p>'; 
-        if(subsidyLoadMoreContainer) subsidyLoadMoreContainer.innerHTML = ''; 
-        return; 
-    }
-    
-    const nextBatch = fuelRecords.slice(displayedSubsidyCount, displayedSubsidyCount + 10);
-    nextBatch.forEach(r => {
-        const div = document.createElement('div');
-        div.className = 'center-item'; 
-        div.style.marginBottom = '5px';
-        div.innerHTML = `
-            <div class="info">
-                <span class="center-name">${r.date} <span class="note">(${r.brand || '기타'})</span></span>
-                <span style="font-weight:bold;">${formatToManwon(safeInt(r.cost))} 만원</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:0.9em; color:#555;">
-                <span>주유량: ${parseFloat(r.liters).toFixed(2)} L</span>
-                <span>단가: ${r.unitPrice} 원</span>
-            </div>`;
-        if(subsidyRecordsList) subsidyRecordsList.appendChild(div);
-    });
-    
-    displayedSubsidyCount += nextBatch.length;
-    
-    if (displayedSubsidyCount < fuelRecords.length && subsidyLoadMoreContainer) { 
-        subsidyLoadMoreContainer.innerHTML = '<button class="load-more-btn" style="margin-top:10px; padding:10px;">▼ 더 보기</button>'; 
-        subsidyLoadMoreContainer.querySelector('button').onclick = () => displaySubsidyRecords(true); 
-    } else if (subsidyLoadMoreContainer) { 
-        subsidyLoadMoreContainer.innerHTML = ''; 
-    }
-}
-
 export function displayDailyRecords() {
     const yearSelect = document.getElementById('daily-year-select');
     const monthSelect = document.getElementById('daily-month-select');
     if(!yearSelect || !monthSelect) return;
-
     const year = yearSelect.value;
     const month = monthSelect.value;
     const selectedPeriod = `${year}-${month}`;
     const dailyTbody = document.querySelector('#daily-summary-table tbody');
     const dailySummaryDiv = document.getElementById('daily-summary');
     const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(selectedPeriod));
-    
     if(dailyTbody) dailyTbody.innerHTML = '';
     if(dailySummaryDiv) {
         dailySummaryDiv.classList.remove('hidden');
         dailySummaryDiv.innerHTML = createSummaryHTML(`${parseInt(month)}월 총계 (04시 기준)`, monthRecords);
     }
-
     const recordsByDate = {};
     monthRecords.forEach(r => {
         const statDate = getStatisticalDate(r.date, r.time);
-        if(!recordsByDate[statDate]) recordsByDate[statDate] = { records: [], income: 0, expense: 0, distance: 0, tripCount: 0 };
+        if(!recordsByDate[statDate]) recordsByDate[statDate] = { records: [], income: 0, expense: 0, fuel: 0, distance: 0, tripCount: 0 };
         recordsByDate[statDate].records.push(r);
     });
-
     Object.keys(recordsByDate).sort().reverse().forEach(date => {
         const dayData = recordsByDate[date];
         const transport = dayData.records.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
-        let inc = 0, exp = 0, dist = 0, count = 0;
+        let inc = 0, exp = 0, fuel = 0, dist = 0, count = 0;
         dayData.records.forEach(r => {
-            if(r.type !== '운행종료' && r.type !== '운행취소') { inc += safeInt(r.income); exp += safeInt(r.cost); }
+            if(r.type === '주유소') {
+                fuel += safeInt(r.cost);
+            } else if (r.type !== '운행종료' && r.type !== '운행취소') {
+                inc += safeInt(r.income); 
+                exp += safeInt(r.cost); 
+            }
             if(r.type === '화물운송') { dist += safeFloat(r.distance); count++; }
         });
-        
-        if (count === 0) return;
-        
+        if (count === 0 && inc === 0 && exp === 0 && fuel === 0) return;
         const tr = document.createElement('tr');
         if(date === getTodayString()) tr.style.fontWeight = 'bold';
-        
-        tr.innerHTML = `<td data-label="일">${parseInt(date.substring(8,10))}일</td><td data-label="수입"><span class="income">${formatToManwon(inc)}</span></td><td data-label="지출"><span class="cost">${formatToManwon(exp)}</span></td><td data-label="정산"><strong>${formatToManwon(inc-exp)}</strong></td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td><td data-label="관리"><button class="edit-btn" onclick="window.viewDateDetails('${date}')">상세</button></td>`;
+        tr.innerHTML = `<td data-label="일">${parseInt(date.substring(8,10))}일</td><td data-label="수입"><span class="income">${formatToManwon(inc)}</span></td><td data-label="지출"><span class="cost">${formatToManwon(exp)}</span></td><td data-label="주유"><span class="cost">${formatToManwon(fuel)}</span></td><td data-label="정산"><strong>${formatToManwon(inc-exp-fuel)}</strong></td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td><td data-label="관리"><button class="edit-btn" onclick="window.viewDateDetails('${date}')">상세</button></td>`;
         if(dailyTbody) dailyTbody.appendChild(tr);
     });
 }
@@ -245,17 +180,14 @@ export function displayWeeklyRecords() {
     const yearSelect = document.getElementById('weekly-year-select');
     const monthSelect = document.getElementById('weekly-month-select');
     if(!yearSelect || !monthSelect) return;
-
     const year = yearSelect.value;
     const month = monthSelect.value;
     const selectedPeriod = `${year}-${month}`;
     const weeklyTbody = document.querySelector('#weekly-summary-table tbody');
     const weeklySummaryDiv = document.getElementById('weekly-summary');
     const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(selectedPeriod));
-    
     if(weeklyTbody) weeklyTbody.innerHTML = '';
     if(weeklySummaryDiv) weeklySummaryDiv.innerHTML = createSummaryHTML(`${parseInt(month)}월 주별`, monthRecords);
-    
     const weeks = {};
     monthRecords.forEach(r => {
         const statDate = getStatisticalDate(r.date, r.time);
@@ -264,18 +196,22 @@ export function displayWeeklyRecords() {
         if(!weeks[w]) weeks[w] = [];
         weeks[w].push(r);
     });
-
     Object.keys(weeks).forEach(w => {
         const data = weeks[w];
         const transport = data.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
-        let inc = 0, exp = 0, dist = 0, count = 0;
+        let inc = 0, exp = 0, fuel = 0, dist = 0, count = 0;
         data.forEach(r => { 
-            if(r.type!=='운행종료'&&r.type!=='운행취소'){inc+=safeInt(r.income);exp+=safeInt(r.cost);} 
+            if(r.type === '주유소') {
+                fuel += safeInt(r.cost);
+            } else if(r.type!=='운행종료'&&r.type!=='운행취소'){
+                inc+=safeInt(r.income);
+                exp+=safeInt(r.cost);
+            } 
             if(r.type==='화물운송'){dist+=safeFloat(r.distance);count++;} 
         });
         const dates = data.map(r => new Date(getStatisticalDate(r.date, r.time)).getDate());
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td data-label="주차">${w}주차</td><td data-label="기간">${Math.min(...dates)}일~${Math.max(...dates)}일</td><td data-label="수입">${formatToManwon(inc)}</td><td data-label="지출">${formatToManwon(exp)}</td><td data-label="정산">${formatToManwon(inc-exp)}</td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td>`;
+        tr.innerHTML = `<td data-label="주차">${w}주차</td><td data-label="기간">${Math.min(...dates)}일~${Math.max(...dates)}일</td><td data-label="수입">${formatToManwon(inc)}</td><td data-label="지출">${formatToManwon(exp)}</td><td data-label="주유">${formatToManwon(fuel)}</td><td data-label="정산">${formatToManwon(inc-exp-fuel)}</td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td>`;
         if(weeklyTbody) weeklyTbody.appendChild(tr);
     });
 }
@@ -299,17 +235,23 @@ export function displayMonthlyRecords() {
     Object.keys(months).sort().reverse().forEach(m => {
         const data = months[m];
         const transport = data.records.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
-        let inc=0,exp=0,dist=0,count=0;
+        let inc=0,exp=0,fuel=0,dist=0,count=0;
          data.records.forEach(r => { 
-            if(r.type!=='운행종료'&&r.type!=='운행취소'){inc+=safeInt(r.income);exp+=safeInt(r.cost);} 
+            if(r.type === '주유소') {
+                fuel += safeInt(r.cost);
+            } else if(r.type!=='운행종료'&&r.type!=='운행취소'){
+                inc+=safeInt(r.income);
+                exp+=safeInt(r.cost);
+            } 
             if(r.type==='화물운송'){dist+=safeFloat(r.distance);count++;} 
         });
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td data-label="월">${parseInt(m.substring(5))}월</td><td data-label="수입">${formatToManwon(inc)}</td><td data-label="지출">${formatToManwon(exp)}</td><td data-label="정산">${formatToManwon(inc-exp)}</td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td>`;
+        tr.innerHTML = `<td data-label="월">${parseInt(m.substring(5))}월</td><td data-label="수입">${formatToManwon(inc)}</td><td data-label="지출">${formatToManwon(exp)}</td><td data-label="주유">${formatToManwon(fuel)}</td><td data-label="정산">${formatToManwon(inc-exp-fuel)}</td><td data-label="거리">${dist.toFixed(1)}</td><td data-label="이동">${count}</td><td data-label="소요">${calculateTotalDuration(transport)}</td>`;
         if(monthlyTbody) monthlyTbody.appendChild(tr);
     });
 }
 
+// ... displayCurrentMonthData, displayCumulativeData, renderMileageSummary, generatePrintView (기존 동일)
 export function displayCurrentMonthData() {
     const now = new Date();
     let checkDate = new Date();
@@ -632,4 +574,48 @@ export function generatePrintView(year, month, period, isDetailed) {
     
     w.document.write(h); 
     w.document.close();
+}
+
+// [누락된 함수 복구] displaySubsidyRecords
+export function displaySubsidyRecords(append = false) {
+    const subsidyRecordsList = document.getElementById('subsidy-records-list');
+    const subsidyLoadMoreContainer = document.getElementById('subsidy-load-more-container');
+    const fuelRecords = MEM_RECORDS.filter(r => r.type === '주유소').sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+    
+    if (!append) { 
+        displayedSubsidyCount = 0; 
+        if(subsidyRecordsList) subsidyRecordsList.innerHTML = ''; 
+    }
+    
+    if (fuelRecords.length === 0) { 
+        if(subsidyRecordsList) subsidyRecordsList.innerHTML = '<p class="note" style="text-align:center; padding:1em;">주유 내역이 없습니다.</p>'; 
+        if(subsidyLoadMoreContainer) subsidyLoadMoreContainer.innerHTML = ''; 
+        return; 
+    }
+    
+    const nextBatch = fuelRecords.slice(displayedSubsidyCount, displayedSubsidyCount + 10);
+    nextBatch.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'center-item'; 
+        div.style.marginBottom = '5px';
+        div.innerHTML = `
+            <div class="info">
+                <span class="center-name">${r.date} <span class="note">(${r.brand || '기타'})</span></span>
+                <span style="font-weight:bold;">${formatToManwon(safeInt(r.cost))} 만원</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:0.9em; color:#555;">
+                <span>주유량: ${parseFloat(r.liters).toFixed(2)} L</span>
+                <span>단가: ${r.unitPrice} 원</span>
+            </div>`;
+        if(subsidyRecordsList) subsidyRecordsList.appendChild(div);
+    });
+    
+    displayedSubsidyCount += nextBatch.length;
+    
+    if (displayedSubsidyCount < fuelRecords.length && subsidyLoadMoreContainer) { 
+        subsidyLoadMoreContainer.innerHTML = '<button class="load-more-btn" style="margin-top:10px; padding:10px;">▼ 더 보기</button>'; 
+        subsidyLoadMoreContainer.querySelector('button').onclick = () => displaySubsidyRecords(true); 
+    } else if (subsidyLoadMoreContainer) { 
+        subsidyLoadMoreContainer.innerHTML = ''; 
+    }
 }

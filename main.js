@@ -3,52 +3,57 @@ import * as Data from './data.js';
 import * as UI from './ui.js';
 import * as Stats from './stats.js';
 
-// ==========================================
-// 1. 이벤트 리스너 등록
-// ==========================================
 function setupEventListeners() {
     const getEl = (id) => document.getElementById(id);
 
-    // [핵심] 주소 표시줄(입력창 아래 파란박스) 클릭 복사 기능
+    // 모바일 아코디언
+    const toggleSections = ['datetime', 'type'];
+    toggleSections.forEach(section => {
+        const legend = getEl(`legend-${section}`);
+        const body = getEl(`body-${section}`);
+        if(legend && body) {
+            legend.addEventListener('click', () => {
+                if(window.innerWidth <= 768) {
+                    legend.classList.toggle('active');
+                    body.classList.toggle('active');
+                }
+            });
+        }
+    });
+
+    // 주소 복사
     getEl('address-display')?.addEventListener('click', (e) => {
         if (e.target.classList.contains('address-clickable')) {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             const addr = e.target.dataset.address;
             if (addr) Utils.copyTextToClipboard(addr, '주소 복사됨');
         }
     });
 
-    // [핵심] 오늘 기록 테이블 클릭 이벤트 (주소 복사 vs 수정 모드 분기)
+    // 테이블 클릭 (수정모드)
     document.querySelector('#today-records-table tbody')?.addEventListener('click', (e) => {
-        // 1. 주소(파란색 글씨)를 클릭했을 경우 -> 복사만 하고 끝냄
         const addrTarget = e.target.closest('.location-clickable');
         if (addrTarget) {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             const center = addrTarget.getAttribute('data-center');
             if(center) {
-                // 주소 데이터가 있으면 주소, 없으면 센터명 복사
                 const loc = Data.MEM_LOCATIONS[center];
                 if(loc && loc.address) Utils.copyTextToClipboard(loc.address, '주소 복사됨');
                 else Utils.copyTextToClipboard(center, '이름 복사됨');
             }
-            return; // 여기서 함수 종료 (수정 모드로 가지 않음)
+            return;
         }
-
-        // 2. 그 외 행(tr)을 클릭했을 경우 -> 수정 모드로 이동
         const rowTarget = e.target.closest('tr');
         if (rowTarget && rowTarget.dataset.id) {
             UI.editRecord(parseInt(rowTarget.dataset.id));
         }
     });
 
-    // 상/하차지 입력 시 자동완성 및 값 초기화 로직
+    // 상/하차지 입력
     const handleLocationInput = () => {
         const fromIn = getEl('from-center');
         const toIn = getEl('to-center');
         const typeIn = getEl('type');
-        
         if(!fromIn || !toIn) return;
 
         const from = fromIn.value.trim();
@@ -57,19 +62,16 @@ function setupEventListeners() {
 
         if((type === '화물운송' || type === '대기') && from && to) {
             const key = `${from}-${to}`;
-            
             const incomeEl = getEl('income');
             if(incomeEl) {
                 if(Data.MEM_FARES[key]) incomeEl.value = (Data.MEM_FARES[key]/10000).toFixed(2);
                 else incomeEl.value = ''; 
             }
-
             const distEl = getEl('manual-distance');
             if(distEl) {
                 if(Data.MEM_DISTANCES[key]) distEl.value = Data.MEM_DISTANCES[key];
                 else distEl.value = ''; 
             }
-
             const costEl = getEl('cost');
             if(costEl) {
                 if(Data.MEM_COSTS[key]) costEl.value = (Data.MEM_COSTS[key]/10000).toFixed(2);
@@ -82,21 +84,15 @@ function setupEventListeners() {
     getEl('from-center')?.addEventListener('input', handleLocationInput);
     getEl('to-center')?.addEventListener('input', handleLocationInput);
 
-    // 버튼 이벤트들
+    // 버튼들
     getEl('btn-register-trip')?.addEventListener('click', () => {
         const formData = UI.getFormDataWithoutTime();
         if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
-        Data.addRecord({ 
-            id: Date.now(), 
-            date: getEl('date').value, 
-            time: getEl('time').value, 
-            ...formData 
-        });
+        Data.addRecord({ id: Date.now(), date: getEl('date').value, time: getEl('time').value, ...formData });
         Utils.showToast('등록되었습니다.');
         UI.resetForm();
         updateAllDisplays();
     });
-
     getEl('btn-start-trip')?.addEventListener('click', () => {
         const formData = UI.getFormDataWithoutTime();
         if (formData.type === '화물운송' && formData.distance <= 0) { alert('운행거리를 입력해주세요.'); return; }
@@ -107,14 +103,12 @@ function setupEventListeners() {
         if(getEl('today-date-picker')) getEl('today-date-picker').value = statDate;
         updateAllDisplays();
     });
-
     getEl('btn-end-trip')?.addEventListener('click', () => {
         Data.addRecord({ id: Date.now(), date: Utils.getTodayString(), time: Utils.getCurrentTimeString(), type: '운행종료', distance: 0, cost: 0, income: 0 });
         Utils.showToast('운행 종료됨');
         UI.resetForm();
         updateAllDisplays();
     });
-
     getEl('btn-trip-cancel')?.addEventListener('click', () => {
         const formData = UI.getFormDataWithoutTime();
         Data.addRecord({ id: Date.now(), date: Utils.getTodayString(), time: Utils.getCurrentTimeString(), ...formData, type: '운행취소' });
@@ -122,12 +116,9 @@ function setupEventListeners() {
         UI.resetForm();
         updateAllDisplays();
     });
-
     getEl('btn-save-general')?.addEventListener('click', () => {
         const formData = UI.getFormDataWithoutTime();
-        if (formData.type === '지출' || formData.type === '수입') { 
-            if (formData.expenseItem) Data.updateExpenseItemData(formData.expenseItem); 
-        }
+        if (formData.type === '지출' || formData.type === '수입') { if (formData.expenseItem) Data.updateExpenseItemData(formData.expenseItem); }
         Data.addRecord({ id: Date.now(), date: getEl('date').value, time: getEl('time').value, ...formData });
         Utils.showToast('저장되었습니다.');
         UI.populateExpenseDatalist();
@@ -135,23 +126,18 @@ function setupEventListeners() {
         updateAllDisplays();
         if(formData.type === '주유소') Stats.displaySubsidyRecords();
     });
-
     getEl('btn-update-record')?.addEventListener('click', () => {
         const id = parseInt(getEl('edit-id').value);
         const index = Data.MEM_RECORDS.findIndex(r => r.id === id);
         if (index > -1) {
             const original = Data.MEM_RECORDS[index];
             const formData = UI.getFormDataWithoutTime();
-            
             if (formData.type === '화물운송' && formData.from && formData.to) {
                 const key = `${formData.from}-${formData.to}`;
                 if(formData.distance > 0) Data.MEM_DISTANCES[key] = formData.distance;
                 if(formData.income > 0) Data.MEM_FARES[key] = formData.income;
             }
-            if (formData.type === '지출' || formData.type === '수입') { 
-                if (formData.expenseItem) Data.updateExpenseItemData(formData.expenseItem); 
-            }
-
+            if (formData.type === '지출' || formData.type === '수입') { if (formData.expenseItem) Data.updateExpenseItemData(formData.expenseItem); }
             Data.MEM_RECORDS[index] = { ...original, ...formData, date: original.date, time: original.time };
             Data.saveData();
             Utils.showToast('수정 완료');
@@ -161,7 +147,6 @@ function setupEventListeners() {
             updateAllDisplays();
         }
     });
-
     getEl('btn-delete-record')?.addEventListener('click', () => {
         if(confirm('정말 삭제하시겠습니까?')) {
             const id = parseInt(getEl('edit-id').value);
@@ -174,9 +159,7 @@ function setupEventListeners() {
             updateAllDisplays();
         }
     });
-
     getEl('btn-cancel-edit')?.addEventListener('click', UI.resetForm);
-
     getEl('btn-edit-start-trip')?.addEventListener('click', () => {
         const nowTime = Utils.getCurrentTimeString();
         const nowDate = Utils.getTodayString();
@@ -193,7 +176,6 @@ function setupEventListeners() {
             updateAllDisplays();
         }
     });
-
     getEl('btn-edit-end-trip')?.addEventListener('click', () => {
         const nowTime = Utils.getCurrentTimeString();
         const nowDate = Utils.getTodayString();
@@ -219,6 +201,32 @@ function setupEventListeners() {
     getEl('prev-day-btn')?.addEventListener('click', () => moveDate(-1));
     getEl('next-day-btn')?.addEventListener('click', () => moveDate(1));
 
+    // [화살표 추가] 일/주/월
+    const changeDateSelect = (yId, mId, delta) => {
+        const yEl = getEl(yId), mEl = getEl(mId);
+        if(!yEl || !mEl) return;
+        const d = new Date(parseInt(yEl.value), parseInt(mEl.value) - 1 + delta, 1);
+        yEl.value = d.getFullYear();
+        mEl.value = String(d.getMonth() + 1).padStart(2, '0');
+        updateAllDisplays();
+    };
+    getEl('prev-daily-btn')?.addEventListener('click', () => changeDateSelect('daily-year-select', 'daily-month-select', -1));
+    getEl('next-daily-btn')?.addEventListener('click', () => changeDateSelect('daily-year-select', 'daily-month-select', 1));
+    getEl('prev-weekly-btn')?.addEventListener('click', () => changeDateSelect('weekly-year-select', 'weekly-month-select', -1));
+    getEl('next-weekly-btn')?.addEventListener('click', () => changeDateSelect('weekly-year-select', 'weekly-month-select', 1));
+    getEl('prev-monthly-btn')?.addEventListener('click', () => {
+        const yEl = getEl('monthly-year-select');
+        if(yEl) { yEl.value = parseInt(yEl.value) - 1; updateAllDisplays(); }
+    });
+    getEl('next-monthly-btn')?.addEventListener('click', () => {
+        const yEl = getEl('monthly-year-select');
+        if(yEl) { yEl.value = parseInt(yEl.value) + 1; updateAllDisplays(); }
+    });
+    ['daily-year-select', 'daily-month-select', 'weekly-year-select', 'weekly-month-select', 'monthly-year-select'].forEach(id => {
+        getEl(id)?.addEventListener('change', updateAllDisplays);
+    });
+
+    // 화면 전환
     getEl('go-to-settings-btn')?.addEventListener('click', () => { 
         getEl('main-page').classList.add("hidden"); 
         getEl('settings-page').classList.remove("hidden"); 
@@ -228,7 +236,6 @@ function setupEventListeners() {
         Stats.displayCurrentMonthData(); 
         Stats.displaySubsidyRecords();
     });
-
     getEl('back-to-main-btn')?.addEventListener('click', () => { 
         getEl('main-page').classList.remove("hidden"); 
         getEl('settings-page').classList.add("hidden"); 
@@ -266,24 +273,9 @@ function setupEventListeners() {
         const l=parseFloat(getEl('fuel-liters').value)||0; 
         if(p&&l) getEl('cost').value=(p*l/10000).toFixed(2); 
     });
-    
     getEl('type')?.addEventListener('change', UI.toggleUI);
     
-    // (모바일 아코디언 토글 로직 추가)
-    const toggleSections = ['datetime', 'type'];
-    toggleSections.forEach(section => {
-        const legend = getEl(`legend-${section}`);
-        const body = getEl(`body-${section}`);
-        if(legend && body) {
-            legend.addEventListener('click', () => {
-                if(window.innerWidth <= 768) {
-                    legend.classList.toggle('active');
-                    body.classList.toggle('active');
-                }
-            });
-        }
-    });
-
+    // 글로벌 함수
     window.viewDateDetails = (date) => { 
         getEl('today-date-picker').value = date; 
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove("active")); 
@@ -292,7 +284,6 @@ function setupEventListeners() {
         getEl("today-view").classList.add("active"); 
         Stats.displayTodayRecords(date); 
     };
-    
     window.toggleAllSummaryValues = (gridElement) => { 
         const items = gridElement.querySelectorAll('.summary-item'); 
         const isShowing = gridElement.classList.toggle('active'); 
@@ -304,12 +295,10 @@ function setupEventListeners() {
     };
 }
 
-// 2. 초기화 및 실행
 function initialSetup() {
     Data.loadAllData();
     UI.populateCenterDatalist();
     UI.populateExpenseDatalist();
-    
     const y = new Date().getFullYear();
     const yrs = []; for(let i=0; i<5; i++) yrs.push(`<option value="${y-i}">${y-i}년</option>`);
     ['daily-year-select', 'weekly-year-select', 'monthly-year-select', 'print-year-select'].forEach(id => {
@@ -319,17 +308,13 @@ function initialSetup() {
     ['daily-month-select', 'weekly-month-select', 'print-month-select'].forEach(id => {
         const el = document.getElementById(id); if(el) { el.innerHTML = ms.join(''); el.value = (new Date().getMonth()+1).toString().padStart(2,'0'); }
     });
-
     const mC = document.getElementById('mileage-correction'); if(mC) mC.value = localStorage.getItem('mileage_correction') || 0;
     const sL = document.getElementById('subsidy-limit'); if(sL) sL.value = localStorage.getItem('fuel_subsidy_limit') || 0;
-    
     const todayStr = Utils.getTodayString();
     const nowTime = Utils.getCurrentTimeString();
     const statToday = Utils.getStatisticalDate(todayStr, nowTime);
-    
     const picker = document.getElementById('today-date-picker');
     if(picker) picker.value = statToday;
-
     UI.resetForm();
     updateAllDisplays();
     setupEventListeners();
@@ -340,7 +325,6 @@ function updateAllDisplays() {
     const picker = document.getElementById('today-date-picker');
     if(!picker) return;
     const targetDate = picker.value;
-    
     Stats.displayTodayRecords(targetDate);
     Stats.displayDailyRecords();
     Stats.displayWeeklyRecords();
@@ -351,31 +335,23 @@ function updateAllDisplays() {
 function moveDate(offset) {
     const picker = document.getElementById('today-date-picker');
     if (!picker || !picker.value) return;
-
     const parts = picker.value.split('-').map(Number);
     const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
     dateObj.setDate(dateObj.getDate() + offset);
-
     const newY = dateObj.getFullYear();
     const newM = String(dateObj.getMonth() + 1).padStart(2, '0');
     const newD = String(dateObj.getDate()).padStart(2, '0');
-    
     picker.value = `${newY}-${newM}-${newD}`;
     Stats.displayTodayRecords(picker.value);
 }
 
-// 2주간 자주 방문한 장소 버튼
 function renderFrequentLocationButtons() {
     const fromContainer = document.getElementById('top-from-centers');
     const toContainer = document.getElementById('top-to-centers');
     if (!fromContainer || !toContainer) return;
-
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-
-    const fromCounts = {};
-    const toCounts = {};
-
+    const fromCounts = {}, toCounts = {};
     Data.MEM_RECORDS.forEach(r => {
         const recordDate = new Date(r.date);
         if ((r.type === '화물운송' || r.type === '대기') && recordDate >= twoWeeksAgo) {
@@ -383,12 +359,12 @@ function renderFrequentLocationButtons() {
             if (r.to) toCounts[r.to] = (toCounts[r.to] || 0) + 1;
         }
     });
-
     const topFrom = Object.entries(fromCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const topTo = Object.entries(toCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
     const buildButtons = (data, container, targetInputId) => {
         container.innerHTML = '';
+        if (data.length === 0) container.style.display = 'none'; 
+        else container.style.display = 'grid'; 
         data.forEach(([name]) => {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -398,18 +374,26 @@ function renderFrequentLocationButtons() {
                 const input = document.getElementById(targetInputId);
                 if(input) {
                     input.value = name;
-                    input.dispatchEvent(new Event('input'));
+                    input.dispatchEvent(new Event('input')); 
                 }
             };
             container.appendChild(btn);
         });
     };
-
     buildButtons(topFrom, fromContainer, 'from-center');
     buildButtons(topTo, toContainer, 'to-center');
 }
 
 function initOtherFeatures() {
+    // 출력 버튼 리스너 (ID 매칭 확인)
+    const getPrintEls = () => ({ y: document.getElementById('print-year-select').value, m: document.getElementById('print-month-select').value });
+    document.getElementById('print-first-half-btn')?.addEventListener('click', () => { const p = getPrintEls(); Stats.generatePrintView(p.y, p.m, 'first', false) });
+    document.getElementById('print-second-half-btn')?.addEventListener('click', () => { const p = getPrintEls(); Stats.generatePrintView(p.y, p.m, 'second', false) });
+    document.getElementById('print-full-month-btn')?.addEventListener('click', () => { const p = getPrintEls(); Stats.generatePrintView(p.y, p.m, 'full', false) });
+    document.getElementById('print-first-half-detail-btn')?.addEventListener('click', () => { const p = getPrintEls(); Stats.generatePrintView(p.y, p.m, 'first', true) });
+    document.getElementById('print-second-half-detail-btn')?.addEventListener('click', () => { const p = getPrintEls(); Stats.generatePrintView(p.y, p.m, 'second', true) });
+    document.getElementById('print-full-month-detail-btn')?.addEventListener('click', () => { const p = getPrintEls(); Stats.generatePrintView(p.y, p.m, 'full', true) });
+
     document.getElementById('export-json-btn')?.addEventListener('click', () => { 
         const data = { records: Data.MEM_RECORDS, centers: Data.MEM_CENTERS, locations: Data.MEM_LOCATIONS, fares: Data.MEM_FARES, distances: Data.MEM_DISTANCES, costs: Data.MEM_COSTS, subsidy: localStorage.getItem('fuel_subsidy_limit'), correction: localStorage.getItem('mileage_correction'), expenseItems: Data.MEM_EXPENSE_ITEMS }; 
         const b = new Blob([JSON.stringify(data,null,2)],{type:"application/json"}); 

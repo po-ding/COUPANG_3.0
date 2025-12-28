@@ -22,8 +22,6 @@
 
         <div id="main-page">
             <form id="record-form" onsubmit="return false;">
-                
-                <!-- [변경] 모바일 아코디언 적용 (기록 일시) -->
                 <fieldset id="datetime-info-fieldset">
                     <legend id="legend-datetime" class="mobile-toggle-legend">기록 일시 <span class="toggle-icon">▼</span></legend>
                     <div id="body-datetime" class="mobile-toggle-body">
@@ -34,7 +32,6 @@
                     </div>
                 </fieldset>
 
-                <!-- [변경] 모바일 아코디언 적용 (기록 종류) -->
                 <fieldset>
                     <legend id="legend-type" class="mobile-toggle-legend">기록 종류 <span class="toggle-icon">▼</span></legend>
                     <div id="body-type" class="mobile-toggle-body">
@@ -149,14 +146,45 @@
                         <tbody></tbody>
                     </table>
                 </div>
-                <!-- 나머지 뷰 (일별/주별/월별) 생략 (변경 없음) -->
-                <div id="daily-view" class="view-content"><div class="selector-group"><select id="daily-year-select"></select><select id="daily-month-select"></select></div><div id="daily-summary" class="summary"></div><table id="daily-summary-table" class="yearly-summary-table"><thead><tr><th>일</th><th>수입</th><th>지출</th><th>정산</th><th>거리</th><th>이동</th><th>소요</th><th>관리</th></tr></thead><tbody></tbody></table></div>
-                <div id="weekly-view" class="view-content"><div class="selector-group"><select id="weekly-year-select"></select><select id="weekly-month-select"></select></div><div id="weekly-summary" class="summary"></div><table id="weekly-summary-table" class="yearly-summary-table"><thead><tr><th>주차</th><th>기간</th><th>수입</th><th>지출</th><th>정산</th><th>거리</th><th>이동</th><th>소요</th></tr></thead><tbody></tbody></table></div>
-                <div id="monthly-view" class="view-content"><div class="selector-group"><select id="monthly-year-select"></select></div><div id="monthly-yearly-summary" class="summary"></div><table id="monthly-summary-table" class="yearly-summary-table"><thead><tr><th>월</th><th>수입</th><th>지출</th><th>정산</th><th>거리</th><th>이동</th><th>소요</th></tr></thead><tbody></tbody></table></div>
+                <!-- [수정] 화살표 버튼 추가 및 주유 컬럼 추가 -->
+                <div id="daily-view" class="view-content">
+                    <div class="selector-group">
+                        <button type="button" id="prev-daily-btn">←</button>
+                        <select id="daily-year-select"></select>
+                        <select id="daily-month-select"></select>
+                        <button type="button" id="next-daily-btn">→</button>
+                    </div>
+                    <div id="daily-summary" class="summary"></div>
+                    <table id="daily-summary-table" class="yearly-summary-table">
+                        <thead><tr><th>일</th><th>수입</th><th>지출</th><th>주유</th><th>정산</th><th>거리</th><th>이동</th><th>소요</th><th>관리</th></tr></thead><tbody></tbody>
+                    </table>
+                </div>
+                <div id="weekly-view" class="view-content">
+                    <div class="selector-group">
+                        <button type="button" id="prev-weekly-btn">←</button>
+                        <select id="weekly-year-select"></select>
+                        <select id="weekly-month-select"></select>
+                        <button type="button" id="next-weekly-btn">→</button>
+                    </div>
+                    <div id="weekly-summary" class="summary"></div>
+                    <table id="weekly-summary-table" class="yearly-summary-table">
+                        <thead><tr><th>주차</th><th>기간</th><th>수입</th><th>지출</th><th>주유</th><th>정산</th><th>거리</th><th>이동</th><th>소요</th></tr></thead><tbody></tbody>
+                    </table>
+                </div>
+                <div id="monthly-view" class="view-content">
+                     <div class="selector-group">
+                        <button type="button" id="prev-monthly-btn">←</button>
+                        <select id="monthly-year-select"></select>
+                        <button type="button" id="next-monthly-btn">→</button>
+                     </div>
+                    <div id="monthly-yearly-summary" class="summary"></div>
+                    <table id="monthly-summary-table" class="yearly-summary-table">
+                        <thead><tr><th>월</th><th>수입</th><th>지출</th><th>주유</th><th>정산</th><th>거리</th><th>이동</th><th>소요</th></tr></thead><tbody></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- 설정 페이지 (변경 없음) -->
         <div id="settings-page" class="hidden">
             <div class="data-summary-section">
                 <h2>데이터 요약</h2>
