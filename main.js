@@ -9,17 +9,37 @@ import * as Stats from './stats.js';
 function setupEventListeners() {
     const getEl = (id) => document.getElementById(id);
 
-    // [누락된 기능 복구] 주소 표시줄 클릭 시 복사하기
+    // [핵심] 주소 표시줄(입력창 아래 파란박스) 클릭 복사 기능
     getEl('address-display')?.addEventListener('click', (e) => {
-        // 클릭한 요소가 주소(address-clickable) 클래스를 가지고 있는지 확인
         if (e.target.classList.contains('address-clickable')) {
             e.preventDefault();
             e.stopPropagation();
-            // 데이터셋에 있는 주소를 복사
             const addr = e.target.dataset.address;
-            if (addr) {
-                Utils.copyTextToClipboard(addr, '주소 복사됨');
+            if (addr) Utils.copyTextToClipboard(addr, '주소 복사됨');
+        }
+    });
+
+    // [핵심] 오늘 기록 테이블 클릭 이벤트 (주소 복사 vs 수정 모드 분기)
+    document.querySelector('#today-records-table tbody')?.addEventListener('click', (e) => {
+        // 1. 주소(파란색 글씨)를 클릭했을 경우 -> 복사만 하고 끝냄
+        const addrTarget = e.target.closest('.location-clickable');
+        if (addrTarget) {
+            e.preventDefault();
+            e.stopPropagation();
+            const center = addrTarget.getAttribute('data-center');
+            if(center) {
+                // 주소 데이터가 있으면 주소, 없으면 센터명 복사
+                const loc = Data.MEM_LOCATIONS[center];
+                if(loc && loc.address) Utils.copyTextToClipboard(loc.address, '주소 복사됨');
+                else Utils.copyTextToClipboard(center, '이름 복사됨');
             }
+            return; // 여기서 함수 종료 (수정 모드로 가지 않음)
+        }
+
+        // 2. 그 외 행(tr)을 클릭했을 경우 -> 수정 모드로 이동
+        const rowTarget = e.target.closest('tr');
+        if (rowTarget && rowTarget.dataset.id) {
+            UI.editRecord(parseInt(rowTarget.dataset.id));
         }
     });
 
@@ -56,7 +76,6 @@ function setupEventListeners() {
                 else costEl.value = ''; 
             }
         }
-        // 주소 표시 업데이트 (UI.js 함수 호출)
         UI.updateAddressDisplay();
     };
 
@@ -250,6 +269,21 @@ function setupEventListeners() {
     
     getEl('type')?.addEventListener('change', UI.toggleUI);
     
+    // (모바일 아코디언 토글 로직 추가)
+    const toggleSections = ['datetime', 'type'];
+    toggleSections.forEach(section => {
+        const legend = getEl(`legend-${section}`);
+        const body = getEl(`body-${section}`);
+        if(legend && body) {
+            legend.addEventListener('click', () => {
+                if(window.innerWidth <= 768) {
+                    legend.classList.toggle('active');
+                    body.classList.toggle('active');
+                }
+            });
+        }
+    });
+
     window.viewDateDetails = (date) => { 
         getEl('today-date-picker').value = date; 
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove("active")); 
@@ -330,13 +364,12 @@ function moveDate(offset) {
     Stats.displayTodayRecords(picker.value);
 }
 
-// [14일 제한 복구] 자주 방문한 장소
+// 2주간 자주 방문한 장소 버튼
 function renderFrequentLocationButtons() {
     const fromContainer = document.getElementById('top-from-centers');
     const toContainer = document.getElementById('top-to-centers');
     if (!fromContainer || !toContainer) return;
 
-    // 14일 전 날짜 계산
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
@@ -345,7 +378,6 @@ function renderFrequentLocationButtons() {
 
     Data.MEM_RECORDS.forEach(r => {
         const recordDate = new Date(r.date);
-        // 최근 2주 이내 데이터만 카운트
         if ((r.type === '화물운송' || r.type === '대기') && recordDate >= twoWeeksAgo) {
             if (r.from) fromCounts[r.from] = (fromCounts[r.from] || 0) + 1;
             if (r.to) toCounts[r.to] = (toCounts[r.to] || 0) + 1;
@@ -357,12 +389,6 @@ function renderFrequentLocationButtons() {
 
     const buildButtons = (data, container, targetInputId) => {
         container.innerHTML = '';
-        if (data.length === 0) {
-            container.style.display = 'none'; 
-        } else {
-            container.style.display = 'grid'; 
-        }
-        
         data.forEach(([name]) => {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -372,7 +398,7 @@ function renderFrequentLocationButtons() {
                 const input = document.getElementById(targetInputId);
                 if(input) {
                     input.value = name;
-                    input.dispatchEvent(new Event('input')); 
+                    input.dispatchEvent(new Event('input'));
                 }
             };
             container.appendChild(btn);

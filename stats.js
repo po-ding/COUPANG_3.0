@@ -4,7 +4,6 @@ import { editRecord } from './ui.js';
 
 let displayedSubsidyCount = 0;
 
-// 안전한 숫자 변환
 function safeInt(value) {
     if (!value) return 0;
     const num = parseInt(String(value).replace(/,/g, ''), 10);
@@ -17,7 +16,6 @@ function safeFloat(value) {
     return isNaN(num) ? 0 : num;
 }
 
-// 총 소요 시간 계산
 export function calculateTotalDuration(records) {
     const sorted = [...records].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     let totalMinutes = 0;
@@ -34,7 +32,6 @@ export function calculateTotalDuration(records) {
     return `${hours}h ${minutes}m`;
 }
 
-// 상단 요약 HTML 생성
 export function createSummaryHTML(title, records) {
     const validRecords = records.filter(r => r.type !== '운행취소' && r.type !== '운행종료');
     let totalIncome = 0, totalExpense = 0, totalDistance = 0, totalTripCount = 0;
@@ -43,12 +40,10 @@ export function createSummaryHTML(title, records) {
     validRecords.forEach(r => {
         totalIncome += safeInt(r.income);
         totalExpense += safeInt(r.cost);
-        
         if (r.type === '주유소') { 
             totalFuelCost += safeInt(r.cost); 
             totalFuelLiters += safeFloat(r.liters); 
         }
-        
         if (['화물운송'].includes(r.type)) { 
             totalDistance += safeFloat(r.distance); 
             totalTripCount++; 
@@ -70,24 +65,23 @@ export function createSummaryHTML(title, records) {
     return `<strong>${title}</strong><div class="summary-toggle-grid" onclick="window.toggleAllSummaryValues(this)">${itemsHtml}</div>`;
 }
 
-// [오늘] 탭 기록 표시 (배경색 로직 포함)
 export function displayTodayRecords(date) {
     const todayTbody = document.querySelector('#today-records-table tbody');
     const todaySummaryDiv = document.getElementById('today-summary');
     
     if(!todayTbody) return;
 
-    // 해당 날짜(04시 기준)의 기록 필터링
     const dayRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time) === date)
                                   .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     
     todayTbody.innerHTML = '';
-    // 운행종료는 목록에서 제외하고 계산용으로만 사용
     const displayList = dayRecords.filter(r => r.type !== '운행종료');
 
     displayList.forEach(r => {
         const tr = document.createElement('tr');
-        tr.onclick = () => editRecord(r.id);
+        
+        // [수정] 무조건 수정모드로 가는 onclick 제거 -> data-id로 식별
+        tr.dataset.id = r.id; 
 
         let timeDisplay = r.time;
         if(r.date !== date) { 
@@ -108,89 +102,58 @@ export function displayTodayRecords(date) {
             let endTime = '진행중';
             let duration = '-';
 
-            // 다음 기록을 찾아 종료 시간 및 소요 시간 계산
             const idx = MEM_RECORDS.findIndex(item => item.id === r.id);
             if (idx > -1 && idx < MEM_RECORDS.length - 1) {
                 const next = MEM_RECORDS[idx + 1];
-                // 다음 기록이 같은 날짜(통계적 날짜) 범위 내인지 등 확인
-                // (단순히 바로 다음 기록을 종료 시점으로 잡음)
-                
                 if (next.date !== r.date) {
                     const monthDay = next.date.substring(5);
                     endTime = `<span style="font-size:0.8em; color:#888;">(${monthDay})</span><br>${next.time}`;
                 } else {
                     endTime = next.time;
                 }
-
                 const startObj = new Date(`${r.date}T${r.time}`);
                 const endObj = new Date(`${next.date}T${next.time}`);
                 const diff = endObj - startObj;
-                
                 if (diff >= 0) {
                     const h = Math.floor(diff / 3600000);
                     const m = Math.floor((diff % 3600000) / 60000);
                     duration = h > 0 ? `${h}h ${m}m` : `${m}m`;
                 }
             } else {
-                // 다음 기록이 없으면 진행중
                 endTime = '진행중';
             }
 
-            // [배경색 적용]
-            if (endTime === '진행중') {
-                tr.classList.add('row-in-progress'); // 연한 초록
-            } else {
-                tr.classList.add('row-completed');   // 연한 회색
-            }
+            if(endTime === '진행중') tr.classList.add('row-in-progress');
+            else tr.classList.add('row-completed');
 
             const fromVal = (r.from||'').replace(/"/g, '&quot;');
             const toVal = (r.to||'').replace(/"/g, '&quot;');
-            
             const fromLoc = MEM_LOCATIONS[r.from] || {};
             const toLoc = MEM_LOCATIONS[r.to] || {};
             
             let fromCell = `<span class="location-clickable" data-center="${fromVal}">${r.from || ''}</span>`;
-            if (fromLoc.memo && fromLoc.memo.trim() !== '') {
-                fromCell += `<span class="table-memo">${fromLoc.memo}</span>`;
-            }
+            if (fromLoc.memo) fromCell += `<span class="table-memo">${fromLoc.memo}</span>`;
             
             let toCell = `<span class="location-clickable" data-center="${toVal}">${r.to || ''}</span>`;
-            if (toLoc.memo && toLoc.memo.trim() !== '') {
-                toCell += `<span class="table-memo">${toLoc.memo}</span>`;
-            }
+            if (toLoc.memo) toCell += `<span class="table-memo">${toLoc.memo}</span>`;
             
             let noteCell = '';
             if(r.distance) noteCell = `<span class="note">${safeFloat(r.distance)} km</span>`;
             if(r.type === '대기') noteCell = `<span class="note">대기중</span>`;
             if(r.type === '운행취소') noteCell = `<span class="note cancelled">취소됨</span>`;
 
-            tr.innerHTML = `
-                <td data-label="시작">${timeDisplay}</td>
-                <td data-label="종료">${endTime}</td>
-                <td data-label="소요">${duration}</td>
-                <td data-label="상차">${fromCell}</td>
-                <td data-label="하차">${toCell}</td>
-                <td data-label="비고">${noteCell}</td>
-                <td data-label="금액">${money}</td>
-            `;
+            tr.innerHTML = `<td data-label="시작">${timeDisplay}</td><td data-label="종료">${endTime}</td><td data-label="소요">${duration}</td><td data-label="상차">${fromCell}</td><td data-label="하차">${toCell}</td><td data-label="비고">${noteCell}</td><td data-label="금액">${money}</td>`;
         } else {
-            // 지출, 수입, 주유 등 기타 항목
             const detail = r.expenseItem || r.supplyItem || r.brand || '';
             const content = `<span style="font-weight:bold; color:#555;">[${r.type}]</span>&nbsp;&nbsp;${detail}`;
-            
-            tr.innerHTML = `
-                <td data-label="시작">${timeDisplay}</td>
-                <td colspan="5" data-label="" style="color:#333;">${content}</td>
-                <td data-label="금액">${money}</td>
-            `;
+            if(r.type === '운행종료') tr.classList.add('row-end');
+            tr.innerHTML = `<td data-label="시작">${timeDisplay}</td><td colspan="5" data-label="" style="color:#333;">${content}</td><td data-label="금액">${money}</td>`;
         }
-        
         todayTbody.appendChild(tr);
     });
     if(todaySummaryDiv) todaySummaryDiv.innerHTML = createSummaryHTML('오늘의 기록 (04시 기준)', dayRecords);
 }
 
-// [설정] 탭 주유 내역 표시
 export function displaySubsidyRecords(append = false) {
     const subsidyRecordsList = document.getElementById('subsidy-records-list');
     const subsidyLoadMoreContainer = document.getElementById('subsidy-load-more-container');
@@ -234,7 +197,6 @@ export function displaySubsidyRecords(append = false) {
     }
 }
 
-// [일별] 탭 표시
 export function displayDailyRecords() {
     const yearSelect = document.getElementById('daily-year-select');
     const monthSelect = document.getElementById('daily-month-select');
@@ -245,7 +207,6 @@ export function displayDailyRecords() {
     const selectedPeriod = `${year}-${month}`;
     const dailyTbody = document.querySelector('#daily-summary-table tbody');
     const dailySummaryDiv = document.getElementById('daily-summary');
-    
     const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(selectedPeriod));
     
     if(dailyTbody) dailyTbody.innerHTML = '';
@@ -280,7 +241,6 @@ export function displayDailyRecords() {
     });
 }
 
-// [주별] 탭 표시
 export function displayWeeklyRecords() {
     const yearSelect = document.getElementById('weekly-year-select');
     const monthSelect = document.getElementById('weekly-month-select');
@@ -291,7 +251,6 @@ export function displayWeeklyRecords() {
     const selectedPeriod = `${year}-${month}`;
     const weeklyTbody = document.querySelector('#weekly-summary-table tbody');
     const weeklySummaryDiv = document.getElementById('weekly-summary');
-    
     const monthRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(selectedPeriod));
     
     if(weeklyTbody) weeklyTbody.innerHTML = '';
@@ -321,20 +280,15 @@ export function displayWeeklyRecords() {
     });
 }
 
-// [월별] 탭 표시
 export function displayMonthlyRecords() {
     const yearSelect = document.getElementById('monthly-year-select');
     if(!yearSelect) return;
-    
     const year = yearSelect.value;
     const monthlyTbody = document.querySelector('#monthly-summary-table tbody');
     const monthlyYearlySummaryDiv = document.getElementById('monthly-yearly-summary');
-    
     const yearRecords = MEM_RECORDS.filter(r => getStatisticalDate(r.date, r.time).startsWith(year));
-    
     if(monthlyYearlySummaryDiv) monthlyYearlySummaryDiv.innerHTML = createSummaryHTML(`${year}년`, yearRecords);
     if(monthlyTbody) monthlyTbody.innerHTML = '';
-    
     const months = {};
     yearRecords.forEach(r => { 
         const statDate = getStatisticalDate(r.date, r.time);
@@ -342,7 +296,6 @@ export function displayMonthlyRecords() {
         if(!months[m]) months[m]={records:[]}; 
         months[m].records.push(r); 
     });
-
     Object.keys(months).sort().reverse().forEach(m => {
         const data = months[m];
         const transport = data.records.filter(r => ['화물운송', '공차이동', '대기', '운행종료', '운행취소'].includes(r.type));
@@ -357,7 +310,6 @@ export function displayMonthlyRecords() {
     });
 }
 
-// [설정] 탭: 실시간 요약 (04시 기준)
 export function displayCurrentMonthData() {
     const now = new Date();
     let checkDate = new Date();
@@ -399,7 +351,6 @@ export function displayCurrentMonthData() {
     if(subSum) subSum.innerHTML = `<div class="progress-label">월 한도: ${limit.toLocaleString()} L | 사용: ${liters.toFixed(1)} L | 잔여: ${remain.toFixed(1)} L</div><div class="progress-bar-container"><div class="progress-bar progress-bar-used" style="width: ${pct}%;"></div></div>`; 
 }
 
-// [설정] 탭: 누적 데이터
 export function displayCumulativeData() {
     const records = MEM_RECORDS.filter(r => r.type !== '운행취소' && r.type !== '운행종료');
     let inc = 0, exp = 0, count = 0, dist = 0, liters = 0;
@@ -430,7 +381,6 @@ export function displayCumulativeData() {
     renderMileageSummary();
 }
 
-// [설정] 탭: 기간별 요약
 export function renderMileageSummary(period = 'monthly') {
     const validRecords = MEM_RECORDS.filter(r => ['화물운송'].includes(r.type));
     let summaryData = {};
@@ -467,7 +417,6 @@ export function renderMileageSummary(period = 'monthly') {
     if(container) container.innerHTML = h;
 }
 
-// [설정] 탭: 인쇄
 export function generatePrintView(year, month, period, isDetailed) {
     const sDay = period === 'second' ? 16 : 1;
     const eDay = period === 'first' ? 15 : 31;
