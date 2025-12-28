@@ -3,22 +3,23 @@ import * as Data from './data.js';
 import * as UI from './ui.js';
 import * as Stats from './stats.js';
 
+// ==========================================
+// 1. 이벤트 리스너 등록
+// ==========================================
 function setupEventListeners() {
     const getEl = (id) => document.getElementById(id);
 
-    // [모바일 아코디언 토글 로직 추가]
-    const toggleSections = ['datetime', 'type'];
-    toggleSections.forEach(section => {
-        const legend = getEl(`legend-${section}`);
-        const body = getEl(`body-${section}`);
-        if(legend && body) {
-            legend.addEventListener('click', () => {
-                // 모바일 환경일 때만 토글
-                if(window.innerWidth <= 768) {
-                    legend.classList.toggle('active');
-                    body.classList.toggle('active');
-                }
-            });
+    // [누락된 기능 복구] 주소 표시줄 클릭 시 복사하기
+    getEl('address-display')?.addEventListener('click', (e) => {
+        // 클릭한 요소가 주소(address-clickable) 클래스를 가지고 있는지 확인
+        if (e.target.classList.contains('address-clickable')) {
+            e.preventDefault();
+            e.stopPropagation();
+            // 데이터셋에 있는 주소를 복사
+            const addr = e.target.dataset.address;
+            if (addr) {
+                Utils.copyTextToClipboard(addr, '주소 복사됨');
+            }
         }
     });
 
@@ -27,6 +28,7 @@ function setupEventListeners() {
         const fromIn = getEl('from-center');
         const toIn = getEl('to-center');
         const typeIn = getEl('type');
+        
         if(!fromIn || !toIn) return;
 
         const from = fromIn.value.trim();
@@ -35,22 +37,26 @@ function setupEventListeners() {
 
         if((type === '화물운송' || type === '대기') && from && to) {
             const key = `${from}-${to}`;
+            
             const incomeEl = getEl('income');
             if(incomeEl) {
                 if(Data.MEM_FARES[key]) incomeEl.value = (Data.MEM_FARES[key]/10000).toFixed(2);
                 else incomeEl.value = ''; 
             }
+
             const distEl = getEl('manual-distance');
             if(distEl) {
                 if(Data.MEM_DISTANCES[key]) distEl.value = Data.MEM_DISTANCES[key];
                 else distEl.value = ''; 
             }
+
             const costEl = getEl('cost');
             if(costEl) {
                 if(Data.MEM_COSTS[key]) costEl.value = (Data.MEM_COSTS[key]/10000).toFixed(2);
                 else costEl.value = ''; 
             }
         }
+        // 주소 표시 업데이트 (UI.js 함수 호출)
         UI.updateAddressDisplay();
     };
 
@@ -324,12 +330,13 @@ function moveDate(offset) {
     Stats.displayTodayRecords(picker.value);
 }
 
-// 2주간 자주 방문한 장소 버튼
+// [14일 제한 복구] 자주 방문한 장소
 function renderFrequentLocationButtons() {
     const fromContainer = document.getElementById('top-from-centers');
     const toContainer = document.getElementById('top-to-centers');
     if (!fromContainer || !toContainer) return;
 
+    // 14일 전 날짜 계산
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
@@ -338,6 +345,7 @@ function renderFrequentLocationButtons() {
 
     Data.MEM_RECORDS.forEach(r => {
         const recordDate = new Date(r.date);
+        // 최근 2주 이내 데이터만 카운트
         if ((r.type === '화물운송' || r.type === '대기') && recordDate >= twoWeeksAgo) {
             if (r.from) fromCounts[r.from] = (fromCounts[r.from] || 0) + 1;
             if (r.to) toCounts[r.to] = (toCounts[r.to] || 0) + 1;
@@ -349,6 +357,12 @@ function renderFrequentLocationButtons() {
 
     const buildButtons = (data, container, targetInputId) => {
         container.innerHTML = '';
+        if (data.length === 0) {
+            container.style.display = 'none'; 
+        } else {
+            container.style.display = 'grid'; 
+        }
+        
         data.forEach(([name]) => {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -358,7 +372,7 @@ function renderFrequentLocationButtons() {
                 const input = document.getElementById(targetInputId);
                 if(input) {
                     input.value = name;
-                    input.dispatchEvent(new Event('input'));
+                    input.dispatchEvent(new Event('input')); 
                 }
             };
             container.appendChild(btn);
