@@ -6,48 +6,6 @@ import * as Stats from './stats.js';
 function setupEventListeners() {
     const getEl = (id) => document.getElementById(id);
 
-    // ============================
-    // [운송 지역 관리] 추가 버튼 수정
-    // ============================
-    getEl('add-center-btn')?.addEventListener('click', () => {
-        // 입력창 요소를 안전하게 가져옴
-        const nameEl = getEl('new-center-name');
-        const addrEl = getEl('new-center-address');
-        const memoEl = getEl('new-center-memo');
-
-        // 요소가 존재할 때만 값을 읽음 (에러 방지)
-        const n = nameEl ? nameEl.value.trim() : '';
-        const a = addrEl ? addrEl.value.trim() : '';
-        const m = memoEl ? memoEl.value.trim() : '';
-
-        if (n) {
-            // 데이터 추가
-            UI.addCenter(n, a, m);
-            
-            // 입력창 초기화
-            if(nameEl) nameEl.value = '';
-            if(addrEl) addrEl.value = '';
-            if(memoEl) memoEl.value = '';
-            
-            // 목록 새로고침
-            const searchVal = getEl('center-search-input') ? getEl('center-search-input').value : '';
-            UI.displayCenterList(searchVal);
-            
-            Utils.showToast(`${n} 지역이 추가되었습니다.`);
-        } else {
-            alert('지역 이름을 입력해주세요.');
-        }
-    });
-
-    // 검색창 입력 시 실시간 필터링
-    getEl('center-search-input')?.addEventListener('input', () => {
-        UI.displayCenterList(getEl('center-search-input').value);
-    });
-
-    // ============================
-    // 기타 기능들
-    // ============================
-
     // 모바일 아코디언
     const toggleSections = ['datetime', 'type'];
     toggleSections.forEach(section => {
@@ -100,7 +58,7 @@ function setupEventListeners() {
 
         const from = fromIn.value.trim();
         const to = toIn.value.trim();
-        const type = typeIn ? typeIn.value : '화물운송';
+        const type = typeIn.value;
 
         if((type === '화물운송' || type === '대기') && from && to) {
             const key = `${from}-${to}`;
@@ -295,8 +253,23 @@ function setupEventListeners() {
             if (header.id === 'toggle-center-management' && !body.classList.contains('hidden')) UI.displayCenterList();
         }); 
     });
+    
+    // [수정] 지역 추가 버튼 기능 보완
+    getEl('add-center-btn')?.addEventListener('click', () => {
+        const n = getEl('new-center-name').value.trim();
+        const a = getEl('new-center-address').value.trim();
+        const m = getEl('new-center-memo').value.trim();
+        if(n) {
+            UI.addCenter(n, a, m);
+            getEl('new-center-name').value = '';
+            getEl('new-center-address').value = '';
+            getEl('new-center-memo').value = '';
+            UI.displayCenterList(getEl('center-search-input').value);
+        }
+    });
+    getEl('center-search-input')?.addEventListener('input', () => UI.displayCenterList(getEl('center-search-input').value));
 
-    // 일괄 적용
+    // [수정] 일괄 적용 버튼 기능 보완
     getEl('batch-apply-btn')?.addEventListener('click', () => {
         const from = getEl('batch-from-center').value.trim();
         const to = getEl('batch-to-center').value.trim();
@@ -323,6 +296,15 @@ function setupEventListeners() {
             updateAllDisplays();
         }
     });
+    
+    // [수정] OCR 수동계산 로직 추가
+    const updateOcrCalc = () => {
+        const c = parseInt(getEl('ocr-cost').value)||0;
+        const s = parseInt(getEl('ocr-subsidy').value)||0;
+        getEl('ocr-net-cost').value = c - s;
+    };
+    getEl('ocr-cost')?.addEventListener('input', updateOcrCalc);
+    getEl('ocr-subsidy')?.addEventListener('input', updateOcrCalc);
 
     document.querySelectorAll('.tab-btn').forEach(btn => { 
         btn.addEventListener("click", event => { 
@@ -418,7 +400,6 @@ function renderFrequentLocationButtons() {
     const fromContainer = document.getElementById('top-from-centers');
     const toContainer = document.getElementById('top-to-centers');
     if (!fromContainer || !toContainer) return;
-
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
     const fromCounts = {}, toCounts = {};
@@ -455,7 +436,6 @@ function renderFrequentLocationButtons() {
 }
 
 function initOtherFeatures() {
-    // 출력 버튼 리스너
     const getPrintEls = () => ({ y: document.getElementById('print-year-select').value, m: document.getElementById('print-month-select').value });
     document.getElementById('print-first-half-btn')?.addEventListener('click', () => { const p = getPrintEls(); Stats.generatePrintView(p.y, p.m, 'first', false) });
     document.getElementById('print-second-half-btn')?.addEventListener('click', () => { const p = getPrintEls(); Stats.generatePrintView(p.y, p.m, 'second', false) });
